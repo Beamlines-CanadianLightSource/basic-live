@@ -29,6 +29,8 @@ IDENTITY_FORMAT = '-%y%m'
 RESTRICT_DOWNLOADS = getattr(settings, 'RESTRICT_DOWNLOADS', False)
 SHIFT_HRS = getattr(settings, 'HOURS_PER_SHIFT', 8)
 SHIFT_SECONDS = SHIFT_HRS * 3600
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
+
 
 MAX_CONTAINER_DEPTH = getattr(settings, 'MAX_CONTAINER_DEPTH', 2)
 SAMPLE_PORT_FIELDS = [
@@ -195,6 +197,22 @@ class Project(AbstractUser):
     class Meta:
         verbose_name = _("Project Account")
 
+class Proposal(models.Model):
+    """Relational model to authorize data access to proposal directories from listed projects."""
+    name = models.SlugField(unique=True)
+    team_members = models.ManyToManyField(Project, null=True, blank=True, related_name='proposals')
+    kind = models.ForeignKey(ProjectType, blank=True, null=True, on_delete=models.SET_NULL,
+                             verbose_name=_("Project Type"))
+    created = models.DateTimeField(_('date created'), auto_now_add=True, editable=False)
+    modified = models.DateTimeField(_('date modified'), auto_now=True, editable=False)
+
+    def __str__(self):
+        return str(self.name) + ": " + ",".join([o.name for o in self.team_members.all()])
+
+    def is_team_member(self, user):
+        if user in self.team_members.all():
+            return True
+        return False
 
 class SSHKey(TimeStampedModel):
     name = models.CharField(max_length=60)
@@ -259,6 +277,8 @@ class SessionManager(models.Manager.from_queryset(SessionQuerySet)):
     use_for_related_fields = True
 
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('proposal')
         return super().get_queryset().select_related('project')
 
 
@@ -266,6 +286,8 @@ class Session(models.Model):
     created = models.DateTimeField(_('date created'), auto_now_add=True, editable=False)
     name = models.CharField(max_length=100)
     project = models.ForeignKey(Project, related_name="sessions", on_delete=models.CASCADE)
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='sessions',
+                             verbose_name=_("Project Number"))
     beamline = models.ForeignKey(Beamline, related_name="sessions", on_delete=models.CASCADE)
     comments = models.TextField()
     url = models.CharField(max_length=200, null=True)
@@ -541,6 +563,8 @@ class Shipment(TransitStatusMixin):
         'cascade_help': _('All associated containers will be left without a shipment')
     }
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='shipments')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='shipments',
+                             verbose_name=_("Project Number"))
     comments = models.TextField(blank=True, null=True, max_length=200)
     tracking_code = models.CharField(blank=True, null=True, max_length=60)
     return_code = models.CharField(blank=True, null=True, max_length=60)
@@ -774,6 +798,8 @@ class Container(TransitStatusMixin):
         'name': _("A visible label on the container. If there is a barcode on the container, scan it here"),
     }
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='containers')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='containers',
+                             verbose_name=_("Project Number"))
     kind = models.ForeignKey(ContainerType, blank=False, null=False, on_delete=models.CASCADE,
                              related_name='containers')
     shipment = models.ForeignKey(Shipment, blank=True, null=True, on_delete=models.SET_NULL, related_name='containers')
@@ -1060,6 +1086,8 @@ class Request(ProjectObjectMixin):
     )
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='requests')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='requests',
+                             verbose_name=_("Project Number"))
     kind = models.ForeignKey(RequestType, on_delete=models.CASCADE, related_name='requests')
     status = models.IntegerField(choices=STATUS_CHOICES, default=STATUS_CHOICES.DRAFT)
     parameters = models.JSONField(blank=True, null=True)
@@ -1121,6 +1149,8 @@ class Group(ProjectObjectMixin):
     TRANSITIONS[ProjectObjectMixin.STATES.DRAFT] = [ProjectObjectMixin.STATES.ACTIVE]
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='sample_groups')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='sample_groups',
+                             verbose_name=_("Project Number"))
     status = models.IntegerField(choices=STATUS_CHOICES, default=ProjectObjectMixin.STATES.DRAFT)
     shipment = models.ForeignKey(Shipment, null=True, blank=True, on_delete=models.SET_NULL, related_name='groups')
     comments = models.TextField(blank=True, null=True)
@@ -1172,6 +1202,8 @@ class SampleQuerySet(models.QuerySet):
 
 class SampleManager(models.Manager.from_queryset(SampleQuerySet)):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('group', 'location', 'container', 'proposal').with_port()
         return super().get_queryset().select_related('group', 'location', 'container', 'project').with_port()
 
 
@@ -1181,6 +1213,8 @@ class Sample(ProjectObjectMixin):
         'barcode': _("If there is a data-matrix code on sample, please scan or input the value here"),
     }
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='samples')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='samples',
+                             verbose_name=_("Project Number"))
     barcode = models.SlugField(null=True, blank=True)
     container = models.ForeignKey(Container, null=True, blank=True, on_delete=models.CASCADE, related_name='samples')
     location = models.ForeignKey(ContainerLocation, on_delete=models.CASCADE, related_name='samples', null=True, blank=True)
@@ -1289,6 +1323,8 @@ class DataManager(models.Manager):
 
 class Data(ActiveStatusMixin):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='datasets')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='datasets',
+                             verbose_name=_("Project Number"))
     group = models.ForeignKey(Group, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets')
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets')
     session = models.ForeignKey(Session, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets')
@@ -1366,6 +1402,8 @@ class Data(ActiveStatusMixin):
 
 class AnalysisReport(ActiveStatusMixin):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='reports')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='reports',
+                             verbose_name=_("Project Number"))
     kind = models.CharField(max_length=100)
     score = models.FloatField(_("Analysis Report Score"), null=True, default=0.0)
     data = models.ManyToManyField(Data, blank=True, related_name="reports")

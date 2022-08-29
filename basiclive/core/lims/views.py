@@ -27,6 +27,8 @@ from . import forms, models, stats
 DOWNLOAD_PROXY_URL = getattr(settings, 'DOWNLOAD_PROXY_URL', "http://basiclive.core-data/download")
 LIMS_USE_SCHEDULE = getattr(settings, 'LIMS_USE_SCHEDULE', False)
 LIMS_USE_ACL = getattr(settings, 'LIMS_USE_ACL', False)
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
+
 
 if LIMS_USE_SCHEDULE:
     from basiclive.core.schedule.models import AccessType, BeamlineSupport, Beamtime
@@ -74,17 +76,79 @@ class ProjectDetail(UserPassesTestMixin, detail.DetailView):
         context = super(ProjectDetail, self).get_context_data(**kwargs)
         now = timezone.now()
         one_year_ago = now - timedelta(days=365)
+        two_years_ago = now - timedelta(days=730)
+
         project = self.request.user
-        shipments = project.shipments.filter(
-            Q(status__lt=models.Shipment.STATES.RETURNED)
-            | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
-        ).annotate(
-            data_count=Count('containers__samples__datasets', distinct=True),
-            report_count=Count('containers__samples__datasets__reports', distinct=True),
-            sample_count=Count('containers__samples', distinct=True),
-            group_count=Count('groups', distinct=True),
-            container_count=Count('containers', distinct=True),
-        ).order_by('status', '-date_shipped', '-created').prefetch_related('project')
+        if LIMS_USE_PROPOSAL:
+            props = project.proposals.filter(created__gt=two_years_ago).all()
+            for i, p in enumerate(props):
+                if i == 0:
+                    shipments = p.shipments.filter(
+                                        Q(status__lt=models.Shipment.STATES.RETURNED)
+                                        | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
+                                    ).annotate(
+                                        data_count=Count('containers__samples__datasets', distinct=True),
+                                        report_count=Count('containers__samples__datasets__reports', distinct=True),
+                                        sample_count=Count('containers__samples', distinct=True),
+                                        group_count=Count('groups', distinct=True),
+                                        container_count=Count('containers', distinct=True),
+                                    ).order_by('status', '-date_shipped', '-created').prefetch_related('proposal')
+
+                    sessions = p.sessions.filter(
+                        created__gt=one_year_ago
+                    ).annotate(
+                        data_count=Count('datasets', distinct=True),
+                        report_count=Count('datasets__reports', distinct=True),
+                        last_record=Max('datasets__end_time'),
+                        end=Max('stretches__end')
+                    ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project',
+                                                                                                   'beamline')[:7]
+                else:
+                    shipments.union(
+                        p.shipments.filter(
+                            Q(status__lt=models.Shipment.STATES.RETURNED)
+                            | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
+                        ).annotate(
+                            data_count=Count('containers__samples__datasets', distinct=True),
+                            report_count=Count('containers__samples__datasets__reports', distinct=True),
+                            sample_count=Count('containers__samples', distinct=True),
+                            group_count=Count('groups', distinct=True),
+                            container_count=Count('containers', distinct=True),
+                        ).order_by('status', '-date_shipped', '-created').prefetch_related('proposal')
+                    )
+                    sessions.union(
+                        p.sessions.filter(
+                            created__gt=one_year_ago
+                        ).annotate(
+                            data_count=Count('datasets', distinct=True),
+                            report_count=Count('datasets__reports', distinct=True),
+                            last_record=Max('datasets__end_time'),
+                            end=Max('stretches__end')
+                        ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project',
+                                                                            'beamline')[:7]
+                    )
+
+        else:
+
+            shipments = project.shipments.filter(
+                Q(status__lt=models.Shipment.STATES.RETURNED)
+                | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
+            ).annotate(
+                data_count=Count('containers__samples__datasets', distinct=True),
+                report_count=Count('containers__samples__datasets__reports', distinct=True),
+                sample_count=Count('containers__samples', distinct=True),
+                group_count=Count('groups', distinct=True),
+                container_count=Count('containers', distinct=True),
+            ).order_by('status', '-date_shipped', '-created').prefetch_related('project')
+
+            sessions = project.sessions.filter(
+                created__gt=one_year_ago
+            ).annotate(
+                data_count=Count('datasets', distinct=True),
+                report_count=Count('datasets__reports', distinct=True),
+                last_record=Max('datasets__end_time'),
+                end=Max('stretches__end')
+            ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project', 'beamline')[:7]
 
         if LIMS_USE_SCHEDULE:
             access_types = AccessType.objects.all()
@@ -93,14 +157,7 @@ class ProjectDetail(UserPassesTestMixin, detail.DetailView):
             ).order_by('-current', 'start')
             context.update(beamtimes=beamtimes, access_types=access_types)
 
-        sessions = project.sessions.filter(
-            created__gt=one_year_ago
-        ).annotate(
-            data_count=Count('datasets', distinct=True),
-            report_count=Count('datasets__reports', distinct=True),
-            last_record=Max('datasets__end_time'),
-            end=Max('stretches__end')
-        ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project', 'beamline')[:7]
+
 
         context.update(shipments=shipments, sessions=sessions)
         return context
@@ -266,6 +323,8 @@ class OwnerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     owner_field = 'project'
 
     def test_func(self):
+        if LIMS_USE_PROPOSAL:
+            return self.request.user.is_superuser or getattr(self.get_object(), 'proposal').is_team_member(self.request.user)
         return self.request.user.is_superuser or getattr(self.get_object(), self.owner_field) == self.request.user
 
 
@@ -325,7 +384,12 @@ class ListViewMixin(LoginRequiredMixin):
     def get_queryset(self):
         selector = {}
         if not self.request.user.is_superuser:
-            selector = {'project': self.request.user}
+            if LIMS_USE_PROPOSAL:
+                project = self.request.user
+                proposals = project.proposals.values_list('pk', flat=True)
+                selector = {'proposal__in': proposals}
+            else:
+                selector = {'project': self.request.user}
         return super().get_queryset().filter(**selector)
 
     def page_title(self):
@@ -355,8 +419,12 @@ class DetailListMixin(OwnerRequiredMixin):
 class ShipmentList(ListViewMixin, ItemListView):
     model = models.Shipment
     list_filters = ['created', 'status']
-    list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
-    list_search = ['project__username', 'project__name', 'name', 'comments', 'status']
+    if LIMS_USE_PROPOSAL:
+        list_columns = ['id', 'proposal', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
+        list_search = ['proposal__name', 'project__name', 'name', 'comments', 'status']
+    else:
+        list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
+        list_search = ['project__username', 'project__name', 'name', 'comments', 'status']
     link_url = 'shipment-detail'
     link_data = False
     ordering = ['status', '-modified']
@@ -610,8 +678,12 @@ class RequestTypeView(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, e
 class SampleList(ListViewMixin, ItemListView):
     model = models.Sample
     list_filters = ['modified']
-    list_columns = ['id', 'name', 'comments', 'container', 'location']
-    list_search = ['project__name', 'name', 'barcode', 'comments']
+    if LIMS_USE_PROPOSAL:
+        list_columns = ['id', 'name', 'comments', 'container', 'location']
+        list_search = ['proposal__name', 'name', 'barcode', 'comments']
+    else:
+        list_columns = ['id', 'name', 'comments', 'container', 'location']
+        list_search = ['project__name', 'name', 'barcode', 'comments']
     link_url = 'sample-detail'
     ordering = ['-created', '-priority']
     ordering_proxies = {}
@@ -666,7 +738,10 @@ class ContainerList(ListViewMixin, ItemListView):
     model = models.Container
     list_filters = ['modified', 'kind', 'status']
     list_columns = ['name', 'id', 'shipment', 'kind', 'capacity', 'num_samples', 'status']
-    list_search = ['project__name', 'name', 'comments']
+    if LIMS_USE_PROPOSAL:
+        list_search = ['proposal__name', 'name', 'comments']
+    else:
+        list_search = ['project__name', 'name', 'comments']
     link_url = 'container-detail'
     ordering = ['-created']
     ordering_proxies = {}
@@ -807,7 +882,10 @@ class GroupList(ListViewMixin, ItemListView):
     model = models.Group
     list_filters = ['modified', 'status']
     list_columns = ['id', 'name', 'num_samples', 'status']
-    list_search = ['project__name', 'comments', 'name']
+    if LIMS_USE_PROPOSAL:
+        list_search = ['proposal__name', 'comments', 'name']
+    else:
+        list_search = ['project__name', 'comments', 'name']
     link_url = 'group-detail'
     ordering = ['-modified', '-priority']
     ordering_proxies = {}
@@ -878,7 +956,10 @@ class DataList(ListViewMixin, ItemListView):
     model = models.Data
     list_filters = ['modified', filters.YearFilterFactory('modified'), 'kind', 'beamline']
     list_columns = ['id', 'name', 'sample', 'frame_sets', 'session__name', 'energy', 'beamline', 'kind', 'modified']
-    list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'project__name', 'modified']
+    if LIMS_USE_PROPOSAL:
+        list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'proposal__name', 'modified']
+    else:
+        list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'project__name', 'modified']
     link_url = 'data-detail'
     link_field = 'name'
     link_attr = 'data-link'
@@ -938,7 +1019,10 @@ class ReportList(ListViewMixin, ItemListView):
     model = models.AnalysisReport
     list_filters = ['modified', 'kind']
     list_columns = ['id', 'name', 'kind', 'score', 'modified']
-    list_search = ['project__username', 'name', 'data__name']
+    if LIMS_USE_PROPOSAL:
+        list_search = ['proposal__username', 'name', 'data__name']
+    else:
+        list_search = ['project__username', 'name', 'data__name']
     link_field = 'name'
     link_url = 'report-detail'
     ordering = ['-modified']
@@ -1004,15 +1088,26 @@ class ShipmentReportList(ReportList):
 
 class RequestList(ListViewMixin, ItemListView):
     model = models.Request
-    list_filters = [
-        'kind',
-        'status',
-        filters.YearFilterFactory('created', reverse=True),
-        filters.MonthFilterFactory('created'),
-        filters.QuarterFilterFactory('created'),
-        'project__designation',
-        'project__kind',
-    ]
+    if LIMS_USE_PROPOSAL:
+        list_filters = [
+            'kind',
+            'status',
+            filters.YearFilterFactory('created', reverse=True),
+            filters.MonthFilterFactory('created'),
+            filters.QuarterFilterFactory('created'),
+            'proposal__name',
+            'proposal__kind',
+        ]
+    else:
+        list_filters = [
+            'kind',
+            'status',
+            filters.YearFilterFactory('created', reverse=True),
+            filters.MonthFilterFactory('created'),
+            filters.QuarterFilterFactory('created'),
+            'project__designation',
+            'project__kind',
+        ]
     list_columns = ['kind', 'created', 'num_samples', 'status']
     list_search = ['kind__name', 'kind__description', 'comments', 'parameters']
     link_field = 'kind'
