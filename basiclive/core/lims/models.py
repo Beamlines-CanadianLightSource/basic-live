@@ -15,7 +15,7 @@ from django.db.models import Q, F, Count, CharField, BooleanField, Value, Sum
 from django.db.models.functions import Coalesce, Concat
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 
 from memoize import memoize
 from model_utils import Choices
@@ -205,6 +205,7 @@ class Proposal(models.Model):
                              verbose_name=_("Project Type"))
     created = models.DateTimeField(_('date created'), auto_now_add=True, editable=False)
     modified = models.DateTimeField(_('date modified'), auto_now=True, editable=False)
+    active = models.BooleanField(default=True)
 
     def __str__(self):
         return str(self.name) + ": " + ",".join([o.name for o in self.team_members.all()])
