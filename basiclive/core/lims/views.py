@@ -881,10 +881,11 @@ class ContainerDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, e
 class GroupList(ListViewMixin, ItemListView):
     model = models.Group
     list_filters = ['modified', 'status']
-    list_columns = ['id', 'name', 'num_samples', 'status']
     if LIMS_USE_PROPOSAL:
+        list_columns = ['id', 'proposal__name', 'name', 'num_samples', 'status']
         list_search = ['proposal__name', 'comments', 'name']
     else:
+        list_columns = ['id', 'name', 'num_samples', 'status']
         list_search = ['project__name', 'comments', 'name']
     link_url = 'group-detail'
     ordering = ['-modified', '-priority']

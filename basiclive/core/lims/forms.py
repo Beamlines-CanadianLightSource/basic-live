@@ -5,14 +5,17 @@ from collections import OrderedDict
 from crispy_forms.bootstrap import StrictButton
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Field, Layout
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django import forms
 from django.conf import settings
 from django.db.models import Q
 from django.urls import reverse_lazy
 
+
 from .models import Project, Shipment, Automounter, Sample, ComponentType, Container, Group, ContainerLocation, ContainerType
-from .models import Guide, ProjectType, SSHKey, RequestType, Request, REQUEST_SPEC_SCHEMA
+from .models import Guide, ProjectType, SSHKey, RequestType, Request, REQUEST_SPEC_SCHEMA, Proposal
+
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 
 class BodyHelper(FormHelper):
@@ -484,7 +487,8 @@ class RequestParameterForm(forms.ModelForm):
     class Meta:
         model = Request
         fields = ('kind', 'parameters')
-        widgets = {'kind': disabled_widget,
+        widgets = {'name': disabled_widget,
+                   'kind': disabled_widget,
                    'template': disabled_widget,
                    'request': disabled_widget,
                    'parameters': forms.HiddenInput}
@@ -1168,26 +1172,49 @@ class LocationLoadForm(forms.ModelForm):
 class AddShipmentForm(forms.ModelForm):
     class Meta:
         model = Shipment
-        fields = ('name', 'comments', 'project')
+        if LIMS_USE_PROPOSAL:
+            fields = ('name', 'comments', 'project', 'proposal')
+        else:
+            fields = ('name', 'comments', 'project')
         widgets = {
             'comments': forms.Textarea(),
         }
 
     def __init__(self, *args, **kwargs):
         super(AddShipmentForm, self).__init__(*args, **kwargs)
-
+        if LIMS_USE_PROPOSAL:
+            self.fields['proposal'].initial = self.initial['project'].proposals.first()
+            self.fields['proposal'].queryset = self.initial['project'].proposals.filter(active=True)
         if self.initial['project'].is_superuser:
-            name_row = Div(
-                Div(Field('project', css_class="select"), css_class="col-4"),
-                Div('name', css_class="col-8"),
-                css_class="form-row"
-            )
+            if LIMS_USE_PROPOSAL:
+                name_row = Div(
+                    Div(
+                        Div(Field('project', css_class="select"), css_class="col-4"),
+                        Div(Field('proposal', css_class="select"), css_class="col-4"),
+                        css_class="form-row"
+                    ),
+                    Div('name', css_class="col-8"),
+                )
+            else:
+                name_row = Div(
+                    Div(Field('project', css_class="select"), css_class="col-4"),
+                    Div('name', css_class="col-8"),
+                    css_class="form-row"
+                )
         else:
             self.fields['project'].widget = forms.HiddenInput()
-            name_row = Div(
-                Field('project', hidden=True),
-                Field('name', css_class="col-12")
-            )
+            if LIMS_USE_PROPOSAL:
+                name_row = Div(
+                    Div(Field('project', hidden=True)),
+                    Div(Field('proposal', css_class="select"), css_class="col-4"),
+                    Div('name', css_class="col-8"),
+                    css_class="form-row"
+                )
+            else:
+                name_row = Div(
+                    Field('project', hidden=True),
+                    Field('name', css_class="col-12")
+                )
 
         self.body = BodyHelper(self)
         self.body.title = "Create a Shipment"
