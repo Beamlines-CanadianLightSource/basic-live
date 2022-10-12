@@ -13,7 +13,8 @@ markup syntaxes to HTML; currently there is support for:
 
 from django import template
 from django.conf import settings
-from django.utils.encoding import smart_bytes, force_text
+from django.utils.encoding import smart_bytes
+from django.utils.encoding import force_str as force_text
 from django.utils.safestring import mark_safe
 from django.template.defaultfilters import stringfilter
 
