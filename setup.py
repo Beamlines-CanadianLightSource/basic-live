@@ -40,6 +40,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     install_requires=requirements,
+    include_package_data=True,
     package_data = {
         'basiclive':
             package_files('basiclive/core/lims/static') +
