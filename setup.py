@@ -1,6 +1,6 @@
 import os
 import fnmatch
-from setuptools import find_packages, setup
+from setuptools import find_namespace_packages, setup
 
 with open(os.path.join(os.path.dirname(__file__), 'README.md')) as readme:
     long_description = readme.read()
@@ -31,7 +31,7 @@ def package_files(directory, exclude=()):
 setup(
     name='basiclive',
     version=package_version(),
-    packages=find_packages(),
+    packages=find_namespace_packages(include=['basiclive', 'basiclive.*']),
     url='https://github.com/katyjg/basic-live',
     license='MIT',
     author='Kathryn Janzen, Michel Fodje',
@@ -42,14 +42,15 @@ setup(
     install_requires=requirements,
     include_package_data=True,
     package_data = {
-        'basiclive':
-            package_files('basiclive/core/lims/static') +
-            package_files('basiclive/core/lims/templates') +
-            package_files('basiclive/core/acl/templates') +
-            package_files('basiclive/core/crm/templates') +
-            package_files('basiclive/core/publicatons/templates') +
-            package_files('basiclive/core/schedule/templates') +
-            package_files('basiclive/core/schedule/static')
+        'basiclive': package_files('basiclive/core/lims/static/') + [
+            'basiclive/core/lims/templates/*.html',
+            'basiclive/core/acl/templates/*.html',
+            'basiclive/core/crm/templates/*.html',
+            'basiclive/core/publications/migrations/*.tsv',
+            'basiclive/core/publicatons/templates/*.html',
+            'basiclive/core/schedule/templates/*.html',
+            'basiclive/core/schedule/static/scheduler/js/*.js'
+        ]
     },
     classifiers=[
         'Intended Audience :: Developers',
