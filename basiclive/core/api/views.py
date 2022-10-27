@@ -16,6 +16,7 @@ from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
+from django.core.exceptions import FieldError
 
 from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType
 from basiclive.core.lims.models import AnalysisReport, Project, Session
@@ -240,6 +241,8 @@ class ProjectSamples(VerificationMixin, View):
             automounter = beamline.automounters.select_related('container').get(active=True)
         except (Beamline.DoesNotExist, Automounter.DoesNotExist):
             raise http.Http404("Beamline or Automounter does not exist")
+        except FieldError:
+            pass
 
         lookups = ['container__{}'.format('__'.join(['parent']*(i+1))) for i in range(MAX_CONTAINER_DEPTH)]
         query = Q(container__status=Container.STATES.ON_SITE)

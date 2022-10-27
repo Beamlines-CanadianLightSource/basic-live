@@ -1319,6 +1319,8 @@ class DataType(models.Model):
 
 class DataManager(models.Manager):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('kind', 'proposal')
         return super().get_queryset().select_related('kind', 'project')
 
 
