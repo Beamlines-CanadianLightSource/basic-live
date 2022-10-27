@@ -15,4 +15,6 @@ urlpatterns = [
     keyed_url(r'^samples/(?P<beamline>[\w_-]+)/$', views.ProjectSamples.as_view(), name='project-samples'),
     keyed_url(r'^launch/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)/$', views.LaunchSession.as_view(), name='session-launch'),
     keyed_url(r'^close/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)/$', views.CloseSession.as_view(), name='session-close'),
+    keyed_url(r'^propsamples/(?P<proposal>[\w_-]+)/$', views.ProposalSamples.as_view(), name='proposal-samples'),
+    keyed_url(r'^propdata/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)/$', views.ProposalDataSets.as_view(), name='proposal-dataset')
 ]

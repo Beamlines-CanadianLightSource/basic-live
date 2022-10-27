@@ -18,7 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 from django.core.exceptions import FieldError
 
-from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType
+from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType, Proposal
 from basiclive.core.lims.models import AnalysisReport, Project, Session
 from basiclive.core.lims.templatetags.converter import humanize_duration
 from basiclive.utils.data import parse_frames
@@ -56,6 +56,7 @@ class VerificationMixin(object):
     """
 
     def dispatch(self, request, *args, **kwargs):
+        print(kwargs)
         if not (kwargs.get('username') and kwargs.get('signature')):
             return http.HttpResponseForbidden()
         else:
@@ -417,3 +418,69 @@ class AddData(VerificationMixin, View):
         ActivityLog.objects.log_activity(request, data, ActivityLog.TYPE.CREATE, "{} uploaded from {}".format(
             data.kind.name, beamline.acronym))
         return JsonResponse({'id': data.pk})
+
+
+
+
+class ProposalSamples(VerificationMixin, View):
+    """
+    :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
+
+    :key: r'^(?P<signature>(?P<username>):.+)/projsamples/(?<proposal>)/$'
+    """
+
+    def get(self, request, *args, **kwargs):
+        project_name = kwargs.get('username')
+        proposal = kwargs.get('proposal')
+        try:
+            project = Project.objects.get(username__exact=project_name)
+        except Project.DoesNotExist:
+            raise http.Http404("Project does not exist.")
+
+        try:
+            proposal = proposal.replace("prj", "")
+            p = Proposal.objects.get(name__iexact=proposal)
+            if not p.is_team_member(project):
+                return http.HttpResponseForbidden()
+        except Proposal.DoesNotExist:
+            raise http.Http404("Proposal does not exist.")
+
+        sample_list = p.samples.filter(collect_status=True).order_by('group__priority', 'priority').values(
+            'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+
+        )
+        samples = [prep_sample(sample, index=i) for i, sample in enumerate(sample_list)]
+        return JsonResponse(samples, safe=False)
+
+
+class ProposalDataSets(VerificationMixin, View):
+    """
+    :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
+
+    :key: r'^(?P<signature>(?P<username>):.+)/dataset/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)$'
+    """
+
+    def get(self, request, *args, **kwargs):
+        project_name = kwargs.get('username')
+        proposal = kwargs.get('proposal')
+        sample_id = kwargs.get('sample')
+        kind = kwargs.get('kind')
+
+        try:
+            project = Project.objects.get(username__exact=project_name)
+        except Project.DoesNotExist:
+            raise http.Http404("Project does not exist.")
+
+        try:
+            proposal = proposal.replace("prj", "")
+            p = Proposal.objects.get(name__iexact=proposal)
+            if not p.is_team_member(project):
+                return http.HttpResponseForbidden()
+        except Proposal.DoesNotExist:
+            raise http.Http404("Proposal does not exist.")
+
+
+        data_list = p.datasets.filter(sample_id=sample_id).order_by('end_time').values()
+        samples = [prep_sample(data, priority=i) for i, data in enumerate(data_list)]
+        return JsonResponse(samples, safe=False)
+
