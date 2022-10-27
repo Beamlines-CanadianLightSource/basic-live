@@ -30,6 +30,7 @@ if settings.LIMS_USE_SCHEDULE:
 
 PROXY_URL = getattr(settings, 'DOWNLOAD_PROXY_URL', '')
 MAX_CONTAINER_DEPTH = getattr(settings, 'MAX_CONTAINER_DEPTH', 2)
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 
 def make_secure_path(path):

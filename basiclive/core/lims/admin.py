@@ -6,11 +6,11 @@ LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 class ProjectAdmin(admin.ModelAdmin):
     if LIMS_USE_PROPOSAL:
-        list_display = ('identity', 'name', 'proposal')
-        search_fields = ('name', 'proposal')
+        list_display = ('identity', 'proposal', 'project')
+        search_fields = ('name', 'proposal__name')
     else:
         list_display = ('identity', 'project')
-        search_fields = ('name', 'project')
+        search_fields = ('name', 'project__name')
 
 
 class UserAdmin(admin.ModelAdmin):
