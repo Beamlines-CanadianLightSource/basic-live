@@ -791,6 +791,8 @@ class ContainerQuerySet(models.QuerySet):
 
 class ContainerManager(models.Manager.from_queryset(ContainerQuerySet)):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('kind', 'proposal', 'location').with_port()
         return super().get_queryset().select_related('kind', 'project', 'location').with_port()
 
 

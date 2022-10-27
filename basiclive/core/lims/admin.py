@@ -1,10 +1,16 @@
 from django.contrib import admin
 from basiclive.core.lims import models
+from django.conf import settings
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('identity', 'project')
-    search_fields = ('name', 'project')
+    if LIMS_USE_PROPOSAL:
+        list_display = ('identity', 'proposal', 'project')
+        search_fields = ('name', 'proposal__name')
+    else:
+        list_display = ('identity', 'project')
+        search_fields = ('name', 'project__name')
 
 
 class UserAdmin(admin.ModelAdmin):
