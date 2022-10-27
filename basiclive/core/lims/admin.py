@@ -10,7 +10,7 @@ class ProjectAdmin(admin.ModelAdmin):
         search_fields = ('name', 'proposal__name')
     else:
         list_display = ('identity', 'project')
-        search_fields = ('name', 'project__name')
+        search_fields = ('name', 'project__username')
 
 
 class UserAdmin(admin.ModelAdmin):
