@@ -213,6 +213,9 @@ class Proposal(models.Model):
     def download_url(self):
         return 'prj{}.tar.gz'.format(self.name)
 
+    def groups(self):
+        return Group.objects.filter(proposal=self).distinct()
+
     def is_team_member(self, user):
         if user in self.team_members.all():
             return True

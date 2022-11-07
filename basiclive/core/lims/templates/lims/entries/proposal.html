@@ -76,7 +76,7 @@
 {% block full %}
 <div class="row">
     <div class="col-12">
-        {% for group in object.sample_groups %}
+        {% for group in object.groups %}
             <h4>
                 <a href="{% url 'group-detail' group.pk %}"><strong>{{ group.name }}</strong></a>
             </h4>
