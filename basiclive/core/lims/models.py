@@ -225,6 +225,10 @@ class Proposal(models.Model):
         return list(samples.values())
 
     @memoize(60)
+    def members(self):
+        return ",".join([o.name for o in self.team_members.all()])
+
+    @memoize(60)
     def total_time(self):
         """
         Returns total time the session was active, in hours

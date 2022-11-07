@@ -1680,8 +1680,8 @@ class ProposalListView(LoginRequiredMixin, ItemListView):
     model = models.Proposal
     template_name = "lims/list.html"
     list_filters = ['modified', 'kind']
-    list_columns = ['id', 'team_members', 'kind', 'modified', 'active']
-    list_search = ['name', 'team_members']
+    list_columns = ['id', 'members', 'kind', 'modified', 'active']
+    list_search = ['name', 'members']
     link_field = 'name'
     link_url = 'proposal-detail'
     ordering = ['-modified']
@@ -1694,7 +1694,7 @@ class ProposalListView(LoginRequiredMixin, ItemListView):
             if LIMS_USE_PROPOSAL:
                 project = self.request.user
                 proposals = project.proposals.values_list('pk', flat=True)
-                selector = {'id__in': proposals}
+                return proposals
             else:
                 selector = {'project': self.request.user}
         return super().get_queryset().filter(**selector)
