@@ -1680,8 +1680,8 @@ class ProposalListView(LoginRequiredMixin, ItemListView):
     model = models.Proposal
     template_name = "lims/list.html"
     list_filters = ['modified', 'kind']
-    list_columns = ['id', 'members', 'kind', 'modified', 'active']
-    list_search = ['name', 'members']
+    list_columns = ['id', 'name', 'members', 'kind', 'modified', 'active']
+    list_search = ['name', 'team_members__name']
     link_field = 'name'
     link_url = 'proposal-detail'
     ordering = ['-modified']
