@@ -31,11 +31,6 @@
     <a href="#!" data-link="{% url 'session-history' object.pk %}">
         {% show_icon label='History' icon='ti ti-md ti-timer' %}
     </a>
-    {% if user.is_superuser %}
-        <a href="{% url 'proposal-statistics' pk=object.pk %}">
-            {% show_icon label='Statistics' icon='ti ti-md ti-pulse' %}
-        </a>
-    {% endif %}
     {% if object.datasets.count %}
         <div class="separator"></div>
         <a href="{% url 'files-proxy' section='archive' path=object.download_url %}">
