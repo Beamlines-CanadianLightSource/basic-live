@@ -25,6 +25,11 @@
     <a class="pull-right" href="{% url 'result-list' %}?search={{ object.username }}" title="Go to Reports for {{ object.username }}">
         {% show_icon label="Reports" icon="ti ti-md ti-bar-chart-alt" badge=object.reports.count %}
     </a>
+    {% if use_proposal %}
+    <a class="pull-right" href="{% url 'proposal-list' %}?search={{ object.username }}" title="Go to Proposals for {{ object.username }}">
+        {% show_icon label="Sessions" icon="ti ti-md ti-calendar" badge=object.proposals.count %}
+    </a>
+    {% endif %}
     <a class="pull-right" href="{% url 'session-list' %}?search={{ object.username }}" title="Go to Sessions for {{ object.username }}">
         {% show_icon label="Sessions" icon="ti ti-md ti-calendar" badge=object.sessions.count %}
     </a>

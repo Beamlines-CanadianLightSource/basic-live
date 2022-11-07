@@ -1694,7 +1694,7 @@ class ProposalListView(LoginRequiredMixin, ItemListView):
             if LIMS_USE_PROPOSAL:
                 project = self.request.user
                 proposals = project.proposals.values_list('pk', flat=True)
-                return proposals
+                selector = {'id__in': proposals}
             else:
                 selector = {'project': self.request.user}
         return super().get_queryset().filter(**selector)

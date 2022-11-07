@@ -31,6 +31,7 @@
 
 {% block body %}
     <!-- User Profile Menu -->
+    {% get_setting 'LIMS_USE_PROPOSAL' as use_proposal %}
     {% if user.is_authenticated %}
         {% include "lims/navs.html" %}
     {% endif %}
