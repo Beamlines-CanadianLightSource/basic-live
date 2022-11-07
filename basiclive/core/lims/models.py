@@ -210,6 +210,9 @@ class Proposal(models.Model):
     def __str__(self):
         return str(self.name) + ": " + ",".join([o.name for o in self.team_members.all()])
 
+    def download_url(self):
+        return 'prj{}.tar.gz'.format(self.name)
+
     def is_team_member(self, user):
         if user in self.team_members.all():
             return True

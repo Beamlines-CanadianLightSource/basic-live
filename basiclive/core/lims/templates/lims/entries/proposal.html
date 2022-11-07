@@ -12,11 +12,11 @@
     <h3>
         <span class="text-thin">Proposal |</span>
         <span class="text-condensed">
-            <span class="text-muted">{{ object.members }}</span><strong>{{ object.name }}</strong>
+            <span class="text-muted">{{ object.members }} |</span><strong>{{ object.name }}</strong>
         </span>
     </h3>
     <span class="text-muted">
-       {{ object.identity }} |
+       {{ object.kind }} |
        Added {{ object.created|naturalday }}
     </span>
 {% endblock %}
@@ -76,7 +76,7 @@
 {% block full %}
 <div class="row">
     <div class="col-12">
-        {% for group in object.groups %}
+        {% for group in object.sample_groups %}
             <h4>
                 <a href="{% url 'group-detail' group.pk %}"><strong>{{ group.name }}</strong></a>
             </h4>
