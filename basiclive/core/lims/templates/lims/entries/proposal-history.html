@@ -21,7 +21,7 @@
                         <td class="text-right">{{ session.duration|default:"Active" }} {% if session.duration|natural_duration %}minutes{% endif %}</td>
                     </tr>
                 {% endfor %}
-                {% for session in object.session.with_duration %}
+                {% for session in object.sessions.with_duration %}
                     <tr>
                         <td>{{ session.start }}</td>
                         <td class="text-right">{{ session.end }}</td>
