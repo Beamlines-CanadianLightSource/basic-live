@@ -424,6 +424,7 @@ class ShipmentList(ListViewMixin, ItemListView):
     if LIMS_USE_PROPOSAL:
         list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
         list_search = ['proposal__name', 'project__name', 'name', 'comments', 'status']
+        link_field = 'name'
     else:
         list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
         list_search = ['project__username', 'project__name', 'name', 'comments', 'status']
@@ -683,6 +684,7 @@ class SampleList(ListViewMixin, ItemListView):
         list_filters = ['proposal__name', 'modified']
         list_columns = ['id', 'name', 'comments', 'container', 'location']
         list_search = ['proposal__name', 'name', 'barcode', 'comments']
+        link_field = 'name'
     else:
         list_filters = ['modified']
         list_columns = ['id', 'name', 'comments', 'container', 'location']
@@ -743,6 +745,7 @@ class ContainerList(ListViewMixin, ItemListView):
     if LIMS_USE_PROPOSAL:
         list_filters = ['proposal__name', 'modified', 'kind', 'status']
         list_search = ['proposal__name', 'name', 'comments']
+        link_field = 'name'
     else:
         list_filters = ['modified', 'kind', 'status']
         list_search = ['project__name', 'name', 'comments']
@@ -888,6 +891,7 @@ class GroupList(ListViewMixin, ItemListView):
         list_filters = ['proposal__name', 'modified', 'status']
         list_columns = ['id', 'name', 'num_samples', 'status']
         list_search = ['proposal__name', 'comments', 'name']
+        link_field = 'name'
     else:
         list_filters = ['modified', 'status']
         list_columns = ['id', 'name', 'num_samples', 'status']
