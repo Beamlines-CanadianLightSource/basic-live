@@ -680,7 +680,7 @@ class RequestTypeView(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, e
 class SampleList(ListViewMixin, ItemListView):
     model = models.Sample
     if LIMS_USE_PROPOSAL:
-        list_filters = ['proposal_name', 'modified']
+        list_filters = ['proposal__name', 'modified']
         list_columns = ['id', 'name', 'comments', 'container', 'location']
         list_search = ['proposal__name', 'name', 'barcode', 'comments']
     else:
@@ -1029,7 +1029,7 @@ class ReportList(ListViewMixin, ItemListView):
     list_columns = ['id', 'name', 'kind', 'score', 'modified']
     if LIMS_USE_PROPOSAL:
         list_filters = ['proposal__name', 'modified', 'kind']
-        list_search = ['proposal_name', 'name', 'data__name']
+        list_search = ['proposal__name', 'name', 'data__name']
     else:
         list_filters = ['modified', 'kind']
         list_search = ['project__username', 'name', 'data__name']
