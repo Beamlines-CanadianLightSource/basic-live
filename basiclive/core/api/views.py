@@ -440,6 +440,7 @@ class ProposalSamples(VerificationMixin, View):
         try:
             proposal = proposal.replace("prj", "")
             p = Proposal.objects.get(name__iexact=proposal)
+            print(p)
             if not p.is_team_member(project):
                 return http.HttpResponseForbidden()
         except Proposal.DoesNotExist:
