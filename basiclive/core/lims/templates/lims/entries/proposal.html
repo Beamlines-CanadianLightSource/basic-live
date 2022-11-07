@@ -22,13 +22,13 @@
 {% endblock %}
 
 {% block object_tools %}
-    <a href="{% url 'proposal-reports' object.pk %}" title="Go to Reports from this session">
+    <a href="{% url 'proposal-reports' object.pk %}" title="Go to Reports associated with this proposal">
         {% show_icon label='Reports' icon='ti ti-md ti-bar-chart-alt' badge=object.num_reports %}
     </a>
-    <a href="{% url 'proposal-data' object.pk %}" title="Go to Data from this session">
+    <a href="{% url 'proposal-data' object.pk %}" title="Go to Data associated with this proposal">
         {% show_icon label='Data' icon='ti ti-md ti-layout-grid3' badge=object.datasets.count %}
     </a>
-    <a href="#!" data-link="{% url 'session-history' object.pk %}">
+    <a href="#!" data-link="{% url 'proposal-history' object.pk %}">
         {% show_icon label='History' icon='ti ti-md ti-timer' %}
     </a>
     {% if object.datasets.count %}
