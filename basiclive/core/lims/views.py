@@ -324,6 +324,8 @@ class OwnerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
 
     def test_func(self):
         if LIMS_USE_PROPOSAL:
+            if not hasattr(self.get_object(), 'proposal'):
+                return self.get_object().is_team_member(self.request.user)
             return self.request.user.is_superuser or getattr(self.get_object(), 'proposal').is_team_member(self.request.user)
         return self.request.user.is_superuser or getattr(self.get_object(), self.owner_field) == self.request.user
 
