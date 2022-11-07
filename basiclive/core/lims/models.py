@@ -241,11 +241,11 @@ class Proposal(models.Model):
 
     @memoize(60)
     def start(self):
-        return timezone.localtime(self.sessions.earliest('start').start)
+        return timezone.localtime(self.sessions.earliest('created').start)
 
     @memoize(60)
     def end(self):
-        return timezone.localtime(self.sessions.latest('start').end or timezone.localtime())
+        return timezone.localtime(self.sessions.latest('created').end or timezone.localtime())
 
     @memoize(60)
     def last_record_time(self):
