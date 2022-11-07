@@ -1,6 +1,9 @@
 from django.urls import path
 from django.views.decorators.cache import cache_page
 from . import views, ajax_views, forms
+from django.conf import settings
+
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 urlpatterns = [
     path('', views.StaffDashboard.as_view(), name='staff-dashboard'),
@@ -119,3 +122,11 @@ urlpatterns = [
     path('guides/<int:pk>/edit/', views.GuideEdit.as_view(), name='guide-edit'),
     path('guides/<int:pk>/delete/', views.GuideDelete.as_view(), name='guide-delete'),
 ]
+
+if LIMS_USE_PROPOSAL:
+    urlpatterns += [
+        path('proposals/', views.ProposalListView.as_view(), name='proposal-list'),
+        path('proposals/<int:pk>', views.ProposalListView.as_view(), name='proposal-detail'),
+        path('proposals/<int:pk>/data/', views.ProposalDataListList.as_view(), name='proposal-data'),
+        path('proposals/<int:pk>/reports/', views.ProposalReportList.as_view(), name='proposal-reports'),
+    ]

@@ -377,6 +377,8 @@ class ListViewMixin(LoginRequiredMixin):
 
     def get_list_columns(self):
         columns = super().get_list_columns()
+        if LIMS_USE_PROPOSAL:
+            return ['proposal__name'] + columns
         if self.request.user.is_superuser and self.show_project:
             return ['project__name'] + columns
         return columns
@@ -420,7 +422,7 @@ class ShipmentList(ListViewMixin, ItemListView):
     model = models.Shipment
     list_filters = ['created', 'status']
     if LIMS_USE_PROPOSAL:
-        list_columns = ['id', 'proposal', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
+        list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
         list_search = ['proposal__name', 'project__name', 'name', 'comments', 'status']
     else:
         list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
@@ -677,11 +679,12 @@ class RequestTypeView(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, e
 
 class SampleList(ListViewMixin, ItemListView):
     model = models.Sample
-    list_filters = ['modified']
     if LIMS_USE_PROPOSAL:
+        list_filters = ['proposal_name', 'modified']
         list_columns = ['id', 'name', 'comments', 'container', 'location']
         list_search = ['proposal__name', 'name', 'barcode', 'comments']
     else:
+        list_filters = ['modified']
         list_columns = ['id', 'name', 'comments', 'container', 'location']
         list_search = ['project__name', 'name', 'barcode', 'comments']
     link_url = 'sample-detail'
@@ -736,11 +739,12 @@ class SampleDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit
 
 class ContainerList(ListViewMixin, ItemListView):
     model = models.Container
-    list_filters = ['modified', 'kind', 'status']
     list_columns = ['name', 'id', 'shipment', 'kind', 'capacity', 'num_samples', 'status']
     if LIMS_USE_PROPOSAL:
+        list_filters = ['proposal__name', 'modified', 'kind', 'status']
         list_search = ['proposal__name', 'name', 'comments']
     else:
+        list_filters = ['modified', 'kind', 'status']
         list_search = ['project__name', 'name', 'comments']
     link_url = 'container-detail'
     ordering = ['-created']
@@ -880,11 +884,12 @@ class ContainerDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, e
 
 class GroupList(ListViewMixin, ItemListView):
     model = models.Group
-    list_filters = ['modified', 'status']
     if LIMS_USE_PROPOSAL:
-        list_columns = ['id', 'proposal__name', 'name', 'num_samples', 'status']
+        list_filters = ['proposal__name', 'modified', 'status']
+        list_columns = ['id', 'name', 'num_samples', 'status']
         list_search = ['proposal__name', 'comments', 'name']
     else:
+        list_filters = ['modified', 'status']
         list_columns = ['id', 'name', 'num_samples', 'status']
         list_search = ['project__name', 'comments', 'name']
     link_url = 'group-detail'
@@ -955,11 +960,12 @@ class GroupDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.
 
 class DataList(ListViewMixin, ItemListView):
     model = models.Data
-    list_filters = ['modified', filters.YearFilterFactory('modified'), 'kind', 'beamline']
     if LIMS_USE_PROPOSAL:
-        list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'proposal__name', 'created', 'modified']
+        list_filters = ['proposal__name', 'modified', filters.YearFilterFactory('modified'), 'kind', 'beamline']
+        list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'created', 'modified']
         list_columns = ['id', 'name', 'sample', 'frame_sets', 'session__name', 'energy', 'beamline', 'kind', 'modified']
     else:
+        list_filters = ['modified', filters.YearFilterFactory('modified'), 'kind', 'beamline']
         list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'project__name', 'modified']
         list_columns = ['id', 'name', 'sample', 'frame_sets', 'session__name', 'energy', 'beamline', 'kind', 'modified']
     link_url = 'data-detail'
@@ -1022,8 +1028,10 @@ class ReportList(ListViewMixin, ItemListView):
     list_filters = ['modified', 'kind']
     list_columns = ['id', 'name', 'kind', 'score', 'modified']
     if LIMS_USE_PROPOSAL:
-        list_search = ['proposal__username', 'name', 'data__name']
+        list_filters = ['proposal__name', 'modified', 'kind']
+        list_search = ['proposal_name', 'name', 'data__name']
     else:
+        list_filters = ['modified', 'kind']
         list_search = ['project__username', 'name', 'data__name']
     link_field = 'name'
     link_url = 'report-detail'
@@ -1300,6 +1308,15 @@ class ActivityLogList(ListViewMixin, ItemListView):
     link_url = 'activitylog-detail'
     link_attr = 'data-link'
     detail_target = '#modal-target'
+
+    def get_list_columns(self):
+        if LIMS_USE_PROPOSAL:
+            columns = self.list_columns
+        else:
+            columns = super().get_list_columns()
+        if self.request.user.is_superuser and self.show_project:
+            return ['project__name'] + columns
+        return columns
 
 
 def format_total_time(val, record):
@@ -1659,6 +1676,28 @@ class GuideDelete(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.
         context['form_action'] = reverse_lazy('guide-delete', kwargs={'pk': self.object.pk})
         return context
 
+class ProposalListView(ListViewMixin, ItemListView):
+    model = models.Proposal
+    list_filters = ['modified', 'kind']
+    list_columns = ['id', 'team_members', 'kind', 'modified', 'active']
+    list_search = ['name', 'team_members']
+    link_field = 'name'
+    link_url = 'proposal-detail'
+    ordering = ['-modified']
+
+class ProposalDetail(OwnerRequiredMixin, detail.DetailView):
+    model = models.Proposal
+    template_name = "lims/entries/proposal.html"
+
+class ProposalDataList(ShipmentDataList):
+    template_name = "lims/entries/proposal-data.html"
+    lookup = 'proposal__pk'
+    detail_model = models.Proposal
+
+class ProposalReportList(ShipmentReportList):
+    template_name = "lims/entries/proposal-reports.html"
+    lookup = 'data__proposal__pk'
+    detail_model = models.Proposal
 
 class ProxyView(View):
     def get(self, request, *args, **kwargs):

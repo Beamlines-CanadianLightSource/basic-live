@@ -1,0 +1,17 @@
+{% extends "lims/entries/proposal-data.html" %}
+{% load static %}
+{% load icons %}
+{% block page_heading %}
+    <h3 class="text-condensed">
+        <span class="text-muted">{{ proposal.team_members|upper }} |</span><strong>{{ proposal.name }}</strong>
+    </h3>
+    <span class="text-muted">
+        Reports in Project
+    </span>
+{% endblock %}
+
+{% block object_tools %}
+    <a href="{% url 'proposal-data' proposal.pk %}" title="Go to Data in this Project">
+        {% show_icon label='Data' icon='ti ti-md ti-layout-grid3' badge=proposal.datasets.count %}
+    </a>
+{% endblock %}

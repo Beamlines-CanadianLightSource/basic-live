@@ -215,6 +215,39 @@ class Proposal(models.Model):
             return True
         return False
 
+    def orphans(self):
+        samples = defaultdict(OrphanSample)
+        for data in self.datasets.filter(sample__isnull=True).all():
+            samples[data.name].name = data.name
+            samples[data.name].orphaned_datasets.append(data)
+            samples[data.name].orphaned_reports.extend(data.reports.all())
+
+        return list(samples.values())
+
+    @memoize(60)
+    def total_time(self):
+        """
+        Returns total time the session was active, in hours
+        """
+        total = self.sessions.with_duration().aggregate(time=Sum('duration'))
+
+        return total['time'].total_seconds() / 3600
+
+    total_time.short_description = _("Duration")
+
+    @memoize(60)
+    def start(self):
+        return timezone.localtime(self.sessions.earliest('start').start)
+
+    @memoize(60)
+    def end(self):
+        return timezone.localtime(self.sessions.latest('start').end or timezone.localtime())
+
+    @memoize(60)
+    def last_record_time(self):
+        last_data = self.datasets.last()
+        return last_data.modified if last_data else self.created
+
 class SSHKey(TimeStampedModel):
     name = models.CharField(max_length=60)
     key = models.TextField()
