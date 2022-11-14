@@ -1432,17 +1432,20 @@ class ShipmentCreate(LoginRequiredMixin, SessionWizardView):
                         'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
                         'name': name.upper(),
                         'shipment': self.shipment,
-                        'project': project
+                        'project': project,
+                        'proposal': self.shipment.proposal
                     }
                     models.Container.objects.get_or_create(**data)
             elif label == 'groups':
+                proposal = self.shipment.proposal
                 if self.request.POST.get('submit') == 'Fill':
                     for i, container in enumerate(self.shipment.containers.all()):
-                        group = self.shipment.groups.create(name=container.name, project=project, priority=(i+1))
+                        group = self.shipment.groups.create(name=container.name, project=project, priority=(i+1),
+                                                            proposal=proposal)
                         group_samples = [
                             models.Sample(
                                 name='{}_{}'.format(group.name, location.name), group=group, project=project,
-                                container=container, location=location
+                                container=container, location=location, proposal=proposal
                             )
                             for location in container.kind.locations.all()
                         ]
@@ -1458,6 +1461,7 @@ class ShipmentCreate(LoginRequiredMixin, SessionWizardView):
                             data.update({
                                 'shipment': self.shipment,
                                 'project': project,
+                                'proposal': proposal,
                                 'priority': i + 1
                             })
                             models.Group.objects.get_or_create(**data)
