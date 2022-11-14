@@ -126,6 +126,7 @@ class LaunchProposalSession(VerificationMixin, View):
         beamline_name = kwargs.get('beamline')
         proposal_name = kwargs.get('proposal')
         session_name = kwargs.get('session')
+
         try:
             project = Project.objects.get(username__exact=project_name)
         except Project.DoesNotExist:
@@ -140,7 +141,7 @@ class LaunchProposalSession(VerificationMixin, View):
             proposal = Proposal.objects.get(name__exact=proposal_name)
         except Proposal.DoesNotExist:
             raise http.Http404("Proposal does not exist.")
-
+        pk = Session.objects.count() + 1
         end_time = None
         if settings.LIMS_USE_SCHEDULE:
             now = timezone.now()
@@ -150,7 +151,7 @@ class LaunchProposalSession(VerificationMixin, View):
                 end_time = max(beamtime.values_list('end', flat=True)).isoformat()
             elif not beamline.active:
                 end_time = (timezone.now() + timedelta(hours=2)).isoformat()
-
+        session_name = f"EXP{pk}-" + session_name
         session, created = Session.objects.get_or_create(project=project, beamline=beamline, proposal=proposal, name=session_name)
         if created:
             # Download  key
