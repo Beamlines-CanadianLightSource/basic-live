@@ -21,7 +21,7 @@ urlpatterns = [
 
 
 if settings.LIMS_USE_PROPOSAL:
-    urlpatterns += [keyed_url(r'^launch/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)/(?P<session>[\w_-]+)/$', views.LaunchProposalSession.as_view(), name='session-launch'),
+    urlpatterns += [keyed_url(r'^launch/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)/(?P<proposal>[\w_-]+)/$', views.LaunchProposalSession.as_view(), name='session-launch'),
 ]
 else:
     urlpatterns += [keyed_url(r'^launch/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)/$', views.LaunchSession.as_view(), name='session-launch'),
