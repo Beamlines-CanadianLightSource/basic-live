@@ -31,6 +31,7 @@ if settings.LIMS_USE_SCHEDULE:
 PROXY_URL = getattr(settings, 'DOWNLOAD_PROXY_URL', '')
 MAX_CONTAINER_DEPTH = getattr(settings, 'MAX_CONTAINER_DEPTH', 2)
 LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
+LIMS_USE_CRM = getattr(settings, 'LIMS_USE_CRM', False)
 
 
 def make_secure_path(path):
@@ -162,12 +163,16 @@ class LaunchProposalSession(VerificationMixin, View):
         session.launch()
         if created:
             ActivityLog.objects.log_activity(request, session, ActivityLog.TYPE.CREATE, 'Session launched')
+        if LIMS_USE_CRM:
+            feedback_url = force_str(reverse_lazy('session-feedback', kwargs={'key': session.feedback_key()}))
 
-        feedback_url = force_str(reverse_lazy('session-feedback', kwargs={'key': session.feedback_key()}))
-
-        session_info = {'session': session.name,
+            session_info = {'session': session.name,
                         'duration': humanize_duration(session.total_time()),
                         'survey': request.build_absolute_uri(feedback_url),
+                        'end_time': end_time}
+        else:
+            session_info = {'session': session.name,
+                        'duration': humanize_duration(session.total_time()),
                         'end_time': end_time}
         return JsonResponse(session_info)
 
