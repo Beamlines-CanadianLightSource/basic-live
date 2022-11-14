@@ -1045,6 +1045,15 @@ class Automounter(models.Model):
         return 'ATM-{:07,d}'.format(self.id).replace(',', '-')
 
     def json_dict(self):
+        if LIMS_USE_PROPOSAL:
+            return {
+                'project_id': self.project.pk,
+                'proposal_id': self.container.proposal.pk,
+                'id': self.pk,
+                'name': self.beamline.name,
+                'comments': self.staff_comments,
+                'container': [container.pk for container in self.children.all()]
+            }
         return {
             'project_id': self.project.pk,
             'id': self.pk,

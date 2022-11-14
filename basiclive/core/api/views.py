@@ -111,6 +111,65 @@ class UpdateUserKey(View):
 
         return JsonResponse({})
 
+class LaunchProposalSession(VerificationMixin, View):
+    """
+    Method to start an MxLIVE Session from the beamline. If a Session with the same name already exists, a new Stretch
+    will be added to the Session.
+
+    :key: r'^(?P<signature>(?P<username>):.+)/launch/(?P<beamline>)/(?P<session>)/$'
+    """
+
+    def post(self, request, *args, **kwargs):
+
+        project_name = kwargs.get('username')
+        beamline_name = kwargs.get('beamline')
+        proposal_name = kwargs.get('proposal')
+        session_name = kwargs.get('session')
+        try:
+            project = Project.objects.get(username__exact=project_name)
+        except Project.DoesNotExist:
+            raise http.Http404("Project does not exist.")
+
+        try:
+            beamline = Beamline.objects.get(acronym__exact=beamline_name)
+        except Beamline.DoesNotExist:
+            raise http.Http404("Beamline does not exist.")
+
+        try:
+            proposal = Proposal.objects.get(name__exact=proposal_name)
+        except Proposal.DoesNotExist:
+            raise http.Http404("Proposal does not exist.")
+
+        end_time = None
+        if settings.LIMS_USE_SCHEDULE:
+            now = timezone.now()
+            beamtime = project.beamtime.filter(beamline=beamline, start__lte=now + timedelta(hours=HALF_SHIFT),
+                                               end__gte=now - timedelta(hours=HALF_SHIFT))
+            if beamtime.exists():
+                end_time = max(beamtime.values_list('end', flat=True)).isoformat()
+            elif not beamline.active:
+                end_time = (timezone.now() + timedelta(hours=2)).isoformat()
+
+        session, created = Session.objects.get_or_create(project=project, beamline=beamline, proposal=proposal, name=session_name)
+        if created:
+            # Download  key
+            try:
+                key = make_secure_path(os.path.join(f"prj{proposal}", "preprocessed", session.name))
+                session.url = key
+                session.save()
+            except ValueError:
+                return http.HttpResponseServerError("Unable to create SecurePath")
+        session.launch()
+        if created:
+            ActivityLog.objects.log_activity(request, session, ActivityLog.TYPE.CREATE, 'Session launched')
+
+        feedback_url = force_str(reverse_lazy('session-feedback', kwargs={'key': session.feedback_key()}))
+
+        session_info = {'session': session.name,
+                        'duration': humanize_duration(session.total_time()),
+                        'survey': request.build_absolute_uri(feedback_url),
+                        'end_time': end_time}
+        return JsonResponse(session_info)
 
 class LaunchSession(VerificationMixin, View):
     """
@@ -243,8 +302,6 @@ class ProjectSamples(VerificationMixin, View):
             automounter = beamline.automounters.select_related('container').get(active=True)
         except (Beamline.DoesNotExist, Automounter.DoesNotExist):
             raise http.Http404("Beamline or Automounter does not exist")
-        except FieldError:
-            pass
 
         lookups = ['container__{}'.format('__'.join(['parent']*(i+1))) for i in range(MAX_CONTAINER_DEPTH)]
         query = Q(container__status=Container.STATES.ON_SITE)
@@ -432,6 +489,7 @@ class ProposalSamples(VerificationMixin, View):
     def get(self, request, *args, **kwargs):
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
+        active = kwargs.get('active')
         try:
             project = Project.objects.get(username__exact=project_name)
         except Project.DoesNotExist:
