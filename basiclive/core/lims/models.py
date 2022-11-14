@@ -302,6 +302,9 @@ class StretchManager(models.Manager.from_queryset(StretchQuerySet)):
 
 class ProjectObjectManager(models.Manager):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            fields = ['proposal', 'project']
+            return super().get_queryset().select_related(*fields)
         return super().get_queryset().select_related('project')
 
 

@@ -1014,11 +1014,19 @@ class ContainerForm(forms.ModelForm):
 class GroupForm(forms.ModelForm):
     class Meta:
         model = Group
-        fields = ('project', 'name', 'comments')
-        widgets = {
-            'project': disabled_widget,
-            'comments': forms.Textarea(attrs={'rows': 5}),
-        }
+        if LIMS_USE_PROPOSAL:
+            fields = ('proposal', 'project', 'name', 'comments')
+            widgets = {
+                'project': disabled_widget,
+                'proposal': disabled_widget,
+                'comments': forms.Textarea(attrs={'rows': 5}),
+            }
+        else:
+            fields = ('project', 'name', 'comments')
+            widgets = {
+                'project': disabled_widget,
+                'comments': forms.Textarea(attrs={'rows': 5}),
+            }
 
     def __init__(self, *args, **kwargs):
         super(GroupForm, self).__init__(*args, **kwargs)
@@ -1032,17 +1040,31 @@ class GroupForm(forms.ModelForm):
         else:
             self.body.title = u"Create New Group"
             self.body.form_action = reverse_lazy("group-new")
-        self.body.layout = Layout(
-            'project',
-            Div(
-                Div('name', css_class="col-12"),
-                css_class="form-row"
-            ),
-            Div(
-                Div('comments', css_class="col-12"),
-                css_class="form-row"
+        if LIMS_USE_PROPOSAL:
+            self.body.layout = Layout(
+                'project',
+                'proposal',
+                Div(
+                    Div('name', css_class="col-12"),
+                    css_class="form-row"
+                ),
+                Div(
+                    Div('comments', css_class="col-12"),
+                    css_class="form-row"
+                )
             )
-        )
+        else:
+            self.body.layout = Layout(
+                'project',
+                Div(
+                    Div('name', css_class="col-12"),
+                    css_class="form-row"
+                ),
+                Div(
+                    Div('comments', css_class="col-12"),
+                    css_class="form-row"
+                )
+            )
         self.footer.layout = Layout(
             StrictButton('Save', type='submit', name="submit", value='submit', css_class='btn btn-primary'),
         )
