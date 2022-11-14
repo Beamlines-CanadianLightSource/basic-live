@@ -304,7 +304,7 @@ class ProjectSamples(VerificationMixin, View):
 
         try:
             beamline = Beamline.objects.get(acronym=beamline_name)
-            automounter = beamline.automounters.select_related('container').get(container__active=True)
+            automounter = Automounter.objects.filter(beamline = beamline).select_related('container').get(active=True)
         except (Beamline.DoesNotExist, Automounter.DoesNotExist):
             raise http.Http404("Beamline or Automounter does not exist")
 
