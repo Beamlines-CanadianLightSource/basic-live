@@ -1491,13 +1491,23 @@ class ShipmentAddContainer(LoginRequiredMixin, SuccessMessageMixin, AsyncFormMix
             if data['id_set'][i]:
                 models.Container.objects.filter(pk=int(data['id_set'][i])).update(name=data['name_set'][i])
             else:
-                info = {
-                    'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
-                    'name': name.upper(),
-                    'shipment': data['shipment'],
-                    'project': data['shipment'].project,
-                    'status': data['shipment'].status
-                }
+                if LIMS_USE_PROPOSAL:
+                    info = {
+                        'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
+                        'name': name.upper(),
+                        'shipment': data['shipment'],
+                        'project': data['shipment'].project,
+                        'proposal': data['shipment'].proposal,
+                        'status': data['shipment'].status
+                    }
+                else:
+                    info = {
+                        'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
+                        'name': name.upper(),
+                        'shipment': data['shipment'],
+                        'project': data['shipment'].project,
+                        'status': data['shipment'].status
+                    }
                 models.Container.objects.get_or_create(**info)
         return HttpResponseRedirect(reverse('shipment-add-groups', kwargs={'pk': self.kwargs.get('pk')}))
 
@@ -1530,11 +1540,19 @@ class ShipmentAddGroup(LoginRequiredMixin, SuccessMessageMixin, AsyncFormMixin, 
             info = {
                 field: data['{}_set'.format(field)][i]
                 for field in ['name', 'comments']}
-            info.update({
-                'shipment': data['shipment'],
-                'project': data['shipment'].project,
-                'priority': i + 1
-            })
+            if LIMS_USE_PROPOSAL:
+                info.update({
+                    'shipment': data['shipment'],
+                    'project': data['shipment'].project,
+                    'proposal': data['shipment'].proposal,
+                    'priority': i + 1
+                })
+            else:
+                info.update({
+                    'shipment': data['shipment'],
+                    'project': data['shipment'].project,
+                    'priority': i + 1
+                })
             if data['id_set'][i]:
                 models.Group.objects.filter(pk=int(data['id_set'][i])).update(**info)
             else:

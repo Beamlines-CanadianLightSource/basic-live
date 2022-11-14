@@ -18,7 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 from django.core.exceptions import FieldError
 
-from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType, Proposal
+from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType, Proposal, Group
 from basiclive.core.lims.models import AnalysisReport, Project, Session
 from basiclive.core.lims.templatetags.converter import humanize_duration
 from basiclive.utils.data import parse_frames
@@ -286,6 +286,73 @@ def prep_sample(info, **kwargs):
     sample.update(**kwargs)
     return sample
 
+class ProposalSampleMount(VerificationMixin, View):
+    """
+    :param name: samplename
+    :param barcode: int
+    :param container: str
+    :param comments: str
+    :param priority: int
+    :param group: str
+
+    :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
+
+    :key: r'^(?P<signature>(?P<username>):.+)/samples/(?P<beamline>)/(?P<session>)$'
+
+    """
+
+    def post(self, request, *args, **kwargs):
+        info = msgpack.loads(request.body, raw=False)
+
+        project_name = kwargs.get('username')
+        beamline_name = kwargs.get('beamline')
+        session_key = kwargs.get('session')
+
+        try:
+            project = Project.objects.get(username__exact=project_name)
+        except Project.DoesNotExist:
+            raise http.Http404("Project does not exist.")
+
+        try:
+            session = Session.objects.get(name__exact=session_key)
+            proposal = session.proposal
+        except Session.DoesNotExist:
+            raise http.Http404("No session by that name.")
+
+        try:
+            beamline = Beamline.objects.get(acronym=beamline_name)
+        except Beamline.DoesNotExist:
+            raise http.Http404("Beamline does not exist")
+
+        try:
+            automounter = Automounter.objects.filter(beamline=beamline).select_related('container').get(active=True)
+        except Automounter.DoesNotExist:
+            automounter = None
+
+        try:
+            group = proposal.groups().get(group__name=info.get('group'))
+        except:
+            group = None
+
+        if not group:
+            group_details = {
+                'name': info.get('group'),
+                'proposal': proposal,
+                'project': project,
+                'priority': info.get('priority'),
+                'comments': "Created on the fly",
+            }
+            group = Group.objects.get_or_create(**group_details)
+
+        details = {
+            'name': info.get('name'),
+            'group': group,
+            'project': project,
+            'proposal': proposal,
+            'collect_status': True,
+
+        }
+
 
 class ProjectSamples(VerificationMixin, View):
     """
@@ -434,7 +501,10 @@ class AddData(VerificationMixin, View):
 
         # Download  key
         try:
-            key = make_secure_path(info.get('directory'))
+            if LIMS_USE_PROPOSAL:
+                key = make_secure_path(info.get('directory') + 'raw/')
+            else:
+                key = make_secure_path(info.get('directory'))
         except ValueError:
             return http.HttpResponseServerError("Unable to create SecurePath")
 
@@ -442,14 +512,30 @@ class AddData(VerificationMixin, View):
         sample = project.samples.filter(pk=info.get('sample_id')).first()
         data = Data.objects.filter(pk=info.get('id')).first()
 
-        details = {
-            'session': (session and session.project == project) and session or None,
-            'project': project,
-            'beamline': beamline,
-            'url': key,
-            'sample': sample,
-            'group': sample and sample.group or None,
-        }
+        if LIMS_USE_PROPOSAL:
+            try:
+                proposal = Proposal.objects.get(name__exact=info.get('proposal'))
+            except:
+                raise http.Http404("Proposal does not exist")
+            details = {
+                'session': (session and session.proposal == proposal) and session or None,
+                'project': project,
+                'proposal': proposal,
+                'beamline': beamline,
+                'file_name': info.get('directory'),
+                'url': key,
+                'sample': sample,
+                'group': sample and sample.group or None,
+            }
+        else:
+            details = {
+                'session': (session and session.project == project) and session or None,
+                'project': project,
+                'beamline': beamline,
+                'url': key,
+                'sample': sample,
+                'group': sample and sample.group or None,
+            }
 
         base_fields = ['energy', 'frames', 'file_name', 'exposure_time', 'attenuation', 'name', 'beam_size']
         details.update({f: info.get(f in TRANSFORMS and TRANSFORMS[f] or f) for f in base_fields})
@@ -466,7 +552,7 @@ class AddData(VerificationMixin, View):
         ) if 'start_time' not in info else dateparse.parse_datetime(info['start_time'])
         details.update(start_time=start_time, end_time=end_time)
 
-        for k in ['sample_id', 'group', 'port', 'frames', 'energy', 'filename', 'exposure', 'attenuation',
+        for k in ['sample_id', 'proposal', 'group', 'port', 'frames', 'energy', 'filename', 'exposure', 'attenuation',
                   'container', 'name', 'directory', 'type', 'id']:
             if k in info:
                 info.pop(k)

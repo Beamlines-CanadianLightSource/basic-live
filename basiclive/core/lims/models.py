@@ -367,6 +367,8 @@ class Session(models.Model):
         self.stretches.active().update(end=timezone.now())
 
     def groups(self):
+        if LIMS_USE_PROPOSAL:
+            return Group.objects.filter(samples__datasets__session=self, proposal=self.proposal).distinct()
         return Group.objects.filter(samples__datasets__session=self, project=self.project).distinct()
 
     def reports(self):
