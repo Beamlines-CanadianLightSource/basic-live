@@ -379,7 +379,7 @@ class ListViewMixin(LoginRequiredMixin):
 
     def get_list_columns(self):
         columns = super().get_list_columns()
-        if LIMS_USE_PROPOSAL:
+        if LIMS_USE_PROPOSAL and self.show_project:
             return ['proposal__name'] + columns
         if self.request.user.is_superuser and self.show_project:
             return ['project__name'] + columns
@@ -387,7 +387,7 @@ class ListViewMixin(LoginRequiredMixin):
 
     def get_queryset(self):
         selector = {}
-        if not self.request.user.is_superuser:
+        if not self.request.user.is_superuser and self.show_project:
             if LIMS_USE_PROPOSAL:
                 project = self.request.user
                 proposals = project.proposals.values_list('pk', flat=True)
