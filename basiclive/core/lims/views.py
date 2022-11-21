@@ -387,12 +387,12 @@ class ListViewMixin(LoginRequiredMixin):
 
     def get_queryset(self):
         selector = {}
-        if not self.request.user.is_superuser and self.show_project:
-            if LIMS_USE_PROPOSAL:
+        if not self.request.user.is_superuser:
+            if LIMS_USE_PROPOSAL and self.show_project:
                 project = self.request.user
                 proposals = project.proposals.values_list('pk', flat=True)
                 selector = {'proposal__in': proposals}
-            else:
+            elif self.show_project:
                 selector = {'project': self.request.user}
         return super().get_queryset().filter(**selector)
 
