@@ -293,7 +293,7 @@ class ProposalSampleMount(VerificationMixin, View):
     :param comments: str
     :param priority: int
 
-    :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
+    :Return: sample mounted.
 
     :key: r'^(?P<signature>(?P<username>):.+)/samples/(?P<beamline>)/(?P<session>)$'
 
@@ -346,7 +346,7 @@ class ProposalSampleMount(VerificationMixin, View):
                 'proposal': proposal,
                 'project': project,
                 'priority': info.get('priority'),
-                'comments': "Created on the fly",
+                'comments': f"Created on the fly during {session_key}",
             }
             if container:
                 group_details.update({ 'shipment': container.shipment,})
@@ -359,7 +359,7 @@ class ProposalSampleMount(VerificationMixin, View):
             'priority': info.get('priority'),
             'proposal': proposal,
             'collect_status': True,
-            'comments': info.get("comments", "Created on the fly"),
+            'comments': info.get("comments", f"Created on the fly during {session_key}"),
             'barcode': info.get('barcode')
         }
         if container:
