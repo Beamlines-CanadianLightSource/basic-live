@@ -16,9 +16,8 @@ from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
-from django.core.exceptions import FieldError
 
-from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType, Proposal, Group
+from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType, Proposal, Group, Sample
 from basiclive.core.lims.models import AnalysisReport, Project, Session
 from basiclive.core.lims.templatetags.converter import humanize_duration
 from basiclive.utils.data import parse_frames
@@ -117,7 +116,7 @@ class LaunchProposalSession(VerificationMixin, View):
     Method to start an MxLIVE Session from the beamline. If a Session with the same name already exists, a new Stretch
     will be added to the Session.
 
-    :key: r'^(?P<signature>(?P<username>):.+)/launch/(?P<beamline>)/(?P<session>)/$'
+    :key: r'^(?P<signature>(?P<username>):.+)/launch/(?P<beamline>)/(?P<session>)/(?P<proposal>)$'
     """
 
     def post(self, request, *args, **kwargs):
@@ -293,7 +292,6 @@ class ProposalSampleMount(VerificationMixin, View):
     :param container: str
     :param comments: str
     :param priority: int
-    :param group: str
 
     :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
 
@@ -322,7 +320,7 @@ class ProposalSampleMount(VerificationMixin, View):
         try:
             beamline = Beamline.objects.get(acronym=beamline_name)
         except Beamline.DoesNotExist:
-            raise http.Http404("Beamline does not exist")
+            raise http.Http404("No beamline by that name.")
 
         try:
             automounter = Automounter.objects.filter(beamline=beamline).select_related('container').get(active=True)
@@ -330,28 +328,46 @@ class ProposalSampleMount(VerificationMixin, View):
             automounter = None
 
         try:
-            group = proposal.groups().get(group__name=info.get('group'))
+            group = proposal.groups().get(group__name=info.get('name'))
         except:
             group = None
 
+        if not automounter:
+            now = timezone.now()
+            one_month_ago = now - timedelta(days=30)
+            container = proposal.containers.filter(status=Container.STATES.ON_SITE, modified__gte=one_month_ago).first()
+        else:
+            container = automounter.container
+
+
         if not group:
             group_details = {
-                'name': info.get('group'),
+                'name': info.get('name'),
                 'proposal': proposal,
                 'project': project,
                 'priority': info.get('priority'),
                 'comments': "Created on the fly",
             }
+            if container:
+                group_details.update({ 'shipment': container.shipment,})
             group = Group.objects.get_or_create(**group_details)
 
         details = {
-            'name': info.get('name'),
+            'name': f"{info.get('name')}_{group.num_samples() + 1}",
             'group': group,
             'project': project,
+            'priority': info.get('priority'),
             'proposal': proposal,
             'collect_status': True,
-
+            'comments': info.get("comments", "Created on the fly"),
+            'barcode': info.get('barcode')
         }
+        if container:
+            details.update({"container": container})
+
+        sample = Sample.objects.get_or_create(**details)
+        return JsonResponse(prep_sample(sample), safe=False)
+
 
 
 class ProjectSamples(VerificationMixin, View):
