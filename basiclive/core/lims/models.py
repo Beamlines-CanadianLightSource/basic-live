@@ -240,8 +240,10 @@ class Proposal(models.Model):
         Returns total time the session was active, in hours
         """
         total = self.sessions.with_duration().aggregate(time=Sum('duration'))
-
-        return total['time'].total_seconds() / 3600
+        if total['time']:
+            return total['time'].total_seconds() / 3600
+        else:
+            return 0.0
 
     total_time.short_description = _("Duration")
 

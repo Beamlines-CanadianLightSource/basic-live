@@ -1176,10 +1176,15 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
         project = self.request.user
         if step == 'start':
             samples = project.samples.filter(pk__in=self.request.GET.getlist('samples'))
+            groups = project.sample_groups.filter(pk__in=self.request.GET.getlist('groups'))
+            if groups:
+                proposal = groups.first().proposal
+            else:
+                proposal = self.request.GET.get('proposal')
             return self.initial_dict.get(step, {
                 'project': project,
-                'proposal': samples.first().proposal,
-                'groups': project.sample_groups.filter(pk__in=self.request.GET.getlist('groups')),
+                'proposal': proposal,
+                'groups': groups,
                 'samples': samples,
             })
         elif step == 'parameters':
