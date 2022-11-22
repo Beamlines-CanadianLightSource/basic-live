@@ -1,31 +1,20 @@
-{% load static %}
+{% load misc_tags %}
 
-<style>
-    table.regions {
-      font-size: 12px;
-    }
-    table.regions tbody td {
-      font-family: 'Fira Code';
-    }
-    table.regions thead  th:not(:first-child), tbody td:not(:first-child) {
-      text-align: right;
-    }
-    table.regions tbody  td:first-child {
-      color: gray;
-    }
-    table.regions tbody  td:not(:first-child) {
-      text-align: right;
-    }
-</style>
-
-<div class="row py-3">
-    <b> Edge:</b>&nbsp;{{ request.parameters.edge }}
-</div>
-<div id="request-{{request.pk}}" class="row"></div>
-
-
-<script type="text/javascript" src="{% static 'lims/vendor/d3/js/d3.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'lims/js/exafs-regions.js' %}"></script>
-<script>
-    $('#request-{{request.pk}}').showRegions({{ request.parameters.regions | safe }});
-</script>
+{% for row in request.kind.layout %}
+    <li class="list-group-item py-0">
+        <div class="row">
+            {% for k, style in row  %}
+                {% with request.parameters|get_item:k as value %}
+                {% with request.kind.spec|get_item:k|get_item:"label" as label %}
+                {% if style != 'hidden'  %}
+                    <div class="col-{{ style }} py-2">
+                        {% if label %}<strong>{{ label }}</strong><br/>{% endif %}
+                        <span title="{{ k }}">{{ request.parameters|get_item:k }}</span>
+                    </div>
+                {% endif %}
+                {% endwith %}
+                {% endwith %}
+            {% endfor %}
+        </div>
+    </li>
+{% endfor %}
