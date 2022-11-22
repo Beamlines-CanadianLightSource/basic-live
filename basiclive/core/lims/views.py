@@ -1175,10 +1175,12 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
     def get_form_initial(self, step):
         project = self.request.user
         if step == 'start':
+            samples = project.samples.filter(pk__in=self.request.GET.getlist('samples'))
             return self.initial_dict.get(step, {
                 'project': project,
+                'proposal': samples.first().proposal,
                 'groups': project.sample_groups.filter(pk__in=self.request.GET.getlist('groups')),
-                'samples': project.samples.filter(pk__in=self.request.GET.getlist('samples'))
+                'samples': samples,
             })
         elif step == 'parameters':
             start_data = self.storage.get_step_data('start')

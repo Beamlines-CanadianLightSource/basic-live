@@ -418,11 +418,20 @@ class RequestForm(forms.ModelForm):
 
     class Meta:
         model = Request
-        fields = ('project', 'name', 'comments', 'kind', 'groups', 'samples', 'template', 'request')
-        widgets = {'project': disabled_widget,
-                   'groups': forms.MultipleHiddenInput,
-                   'samples': forms.MultipleHiddenInput,
-                   'comments': forms.Textarea(attrs={'rows': "2"})}
+        if LIMS_USE_PROPOSAL:
+            fields = ('proposal', 'project', 'name', 'comments', 'kind', 'groups', 'samples', 'template', 'request')
+            widgets = {'project': disabled_widget,
+                       'proposal': disabled_widget,
+                       'groups': forms.MultipleHiddenInput,
+                       'samples': forms.MultipleHiddenInput,
+                       'comments': forms.Textarea(attrs={'rows': "2"})}
+        else:
+            fields = ('project', 'name', 'comments', 'kind', 'groups', 'samples', 'template', 'request')
+            widgets = {'project': disabled_widget,
+                       'groups': forms.MultipleHiddenInput,
+                       'samples': forms.MultipleHiddenInput,
+                       'comments': forms.Textarea(attrs={'rows': "2"})}
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -471,6 +480,7 @@ class RequestForm(forms.ModelForm):
 
         self.body.layout = Layout(
             'project',
+            'proposal',
             autofill,
             Field('name', css_id='name'),
             Field('kind', css_id='kind'),
