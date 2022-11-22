@@ -498,7 +498,7 @@ class RequestParameterForm(forms.ModelForm):
 
     class Meta:
         model = Request
-        fields = ('kind', 'parameters')
+        fields = ('kind', 'name', 'parameters')
         widgets = {'name': disabled_widget,
                    'kind': disabled_widget,
                    'template': disabled_widget,
