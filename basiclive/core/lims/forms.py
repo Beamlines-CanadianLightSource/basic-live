@@ -429,6 +429,8 @@ class RequestForm(forms.ModelForm):
         pk = self.instance.pk
         self.body = BodyHelper(self)
         self.footer = FooterHelper(self)
+        self.body.title = u"Create New Request"
+        self.body.form_action = reverse_lazy('request-new')
 
         group = self.initial['groups'].first()
         self.sample = self.initial['samples'].first()
