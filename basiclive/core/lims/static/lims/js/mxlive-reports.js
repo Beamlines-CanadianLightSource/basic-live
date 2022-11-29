@@ -699,6 +699,131 @@ function drawTimeline(figure, chart, options) {
     }
 }
 
+function drawHeatMap (figure, chart, options){
+    // Hexagonal heatmap, much taken from https://www.visualcinnamon.com/2013/07/self-organizing-maps-creating-hexagonal/
+    const hexbin = d3.hexbin();
+    let margin = {top: 10, right: 10, bottom: 10, left: 10};
+    let width = options.width - margin.left - margin.right;
+    let height = options.height - margin.bottom - margin.top;
+    let xlabel = chart.data.x.shift();
+    let ylabel = chart.data.y.shift();
+    let xmin = Math.min(chart.data.x);
+    let xmax = Math.max(chart.data.x);
+    let ymin = Math.min(chart.data.y);
+    let ymax = Math.max(chart.data.y);
+
+    // Build color scale 500 bits
+    let colorScale = d3.scaleQuantile()
+      .domain(chart.data.z)
+      .range(d3.range(0, 1.002, 0.002));
+
+    //Get # of columns and rows from report
+    let MapColumns = chart.data.x.length,
+    MapRows = chart.data.y.length;
+
+    //Set hexbin extent
+    hexbin.size([width, height])
+
+    //The maximum radius the hexagons can have to still fit the screen
+    let hexRadius = d3.min([width/((MapColumns + 0.5) * Math.sqrt(3)),
+        height/((MapRows + 1/3) * 1.5)]);
+
+    //Create x and y axis
+    let y_scale = d3.scaleLinear()
+        .domain([ymax, ymin])
+        .range([height, 0]);
+
+    let y_axis = d3.axisLeft()
+        .scale(y_scale)
+        .label(ylabel)
+
+    let x_scale = d3.scaleLinear()
+        .domain([xmax, xmin])
+        .range([0, width]);
+
+    let x_axis = d3.axisBottom()
+        .scale(x_scale)
+        .label(xlabel)
+
+    // Create canvas
+    let svg = d3.select(`#${figure.attr('id')}`)
+        .append('svg')
+        .attr('viewBox', `-${margin.left} -${margin.top} ${options.width} ${height}`)
+        .attr('class', 'w-100');
+
+    //Add chart axes
+    svg.append("g")
+    .call(x_axis)
+    svg.append("g")
+    .call(y_axis)
+
+    //Calculate the center position of each hexagon
+    var points = [];
+    for (var i = 0; i < MapRows; i++) {
+        for (var j = 0; j < MapColumns; j++) {
+            var x = hexRadius * j * Math.sqrt(3)
+            //Offset each uneven row by half of a "hex-width" to the right
+            if(i%2 === 1) x += (hexRadius * Math.sqrt(3))/2
+            var y = hexRadius * i * 1.5
+            points.push([x,y])
+        }//for j
+    }//for i
+
+    //tooltip functions https://d3-graph-gallery.com/graph/interactivity_tooltip.html
+    // create a tooltip
+    let tooltip = d3.select(`#${figure.attr('id')}`)
+    .append("div")
+    .style("opacity", 0)
+    .attr("class", "tooltip")
+    .style("background-color", "white")
+    .style("border", "solid")
+    .style("border-width", "2px")
+    .style("border-radius", "5px")
+    .style("padding", "5px")
+
+    // Three functions that change the tooltip when user hover / move / leave a cell
+    let mouseover = function(d) {
+    tooltip
+      .style("opacity", 1)
+    d3.select(this)
+      .style("stroke", "black")
+      .style("opacity", 1)
+    }
+    let mousemove = function(d,i) {
+    tooltip
+      .html(`${points[i]}:${chart.data.z[i]}`)
+      .style("left", (d3.mouse(this)[0]+70) + "px")
+      .style("top", (d3.mouse(this)[1]) + "px")
+    }
+    let mouseleave = function(d) {
+    tooltip
+      .style("opacity", 0)
+    d3.select(this)
+      .style("stroke", "none")
+      .style("opacity", 0.8)
+    }
+
+    //Draw the hexagons
+    svg.append("g")
+        .selectAll(".hexagon")
+        .data(hexbin(points))
+        .enter().append("path")
+        .attr("class", "hexagon")
+        .attr("d", function (d) {
+            return "M" + d.x + "," + d.y + hexbin.hexagon();
+        })
+        .attr("stroke", "white")
+        .attr("stroke-width", "1px")
+        .attr("data-label", (d,i) => `${points[i]}:${chart.data.z[i]}`)
+        .style("fill", function(d) {
+            return d3.interpolateViridis(colorScale(d))
+        })
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemove)
+        .on("mouseleave", mouseleave);
+
+}
+
 (function ($) {
     $.fn.liveReport = function (options) {
         let target = $(this);
@@ -755,6 +880,9 @@ function drawTimeline(figure, chart, options) {
                     break;
                 case 'timeline':
                     drawTimeline(figure, chart, options);
+                    break;
+                case 'heatmap':
+                    drawHeatMap(figure, chart, options);
                     break;
             }
 
