@@ -707,6 +707,7 @@ function drawHeatMap (figure, chart, options){
     let height = options.height - margin.bottom - margin.top;
     let xlabel = chart.data.x.shift();
     let ylabel = chart.data.y.shift();
+    let zlabel = chart.data.z[4].shift();
     let xmin = Math.min(chart.data.x);
     let xmax = Math.max(chart.data.x);
     let ymin = Math.min(chart.data.y);
@@ -714,7 +715,7 @@ function drawHeatMap (figure, chart, options){
 
     // Build color scale 500 bits
     let colorScale = d3.scaleQuantile()
-      .domain(chart.data.z)
+      .domain(chart.data.z[4])
       .range(d3.range(0, 1.002, 0.002));
 
     //Get # of columns and rows from report
@@ -814,7 +815,7 @@ function drawHeatMap (figure, chart, options){
         })
         .attr("stroke", "white")
         .attr("stroke-width", "1px")
-        .attr("data-label", (d,i) => `${points[i]}:${chart.data.z[i]}`)
+        .attr("data-label", (d,i) => `${points[i]}:${chart.data.z[4][i]}`)
         .style("fill", function(d) {
             return d3.interpolateViridis(colorScale(d))
         })
