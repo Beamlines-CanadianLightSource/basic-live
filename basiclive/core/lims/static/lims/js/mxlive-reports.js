@@ -12,7 +12,7 @@ function renderMarkdown(text) {
 }
 
 const figureTypes = [
-    "histogram", "lineplot", "barchart", "scatterplot", "pie", "gauge", "timeline", "columnchart"
+    "histogram", "lineplot", "barchart", "scatterplot", "pie", "gauge", "timeline", "columnchart", "heatmap"
 ];
 
 let ColorSchemes = {
