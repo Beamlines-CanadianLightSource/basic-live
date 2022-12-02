@@ -736,7 +736,6 @@ function drawHeatMap (figure, chart, options){
 
     let y_axis = d3.axisLeft()
         .scale(y_scale)
-        .label(ylabel)
 
     let x_scale = d3.scaleLinear()
         .domain([xmax, xmin])
@@ -744,7 +743,6 @@ function drawHeatMap (figure, chart, options){
 
     let x_axis = d3.axisBottom()
         .scale(x_scale)
-        .label(xlabel)
 
     // Create canvas
     let svg = d3.select(`#${figure.attr('id')}`)
@@ -754,9 +752,25 @@ function drawHeatMap (figure, chart, options){
 
     //Add chart axes
     svg.append("g")
-    .call(x_axis)
+        .call(x_axis)
+    svg.append("text")
+        .attr("transform", "translate(" + (width/2) + " ," + (height + margin.top + 20) + ")")
+        .style("text-anchor", "middle")
+        .style('font-size', '10')
+        .text(xlabel);
+
     svg.append("g")
-    .call(y_axis)
+        .call(y_axis)
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - margin.left)
+        .attr("x",0 - (height / 2))
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .style('font-size', '10')
+        .text(ylabel);
+
+
 
     //Calculate the center position of each hexagon
     var points = [];
@@ -823,6 +837,17 @@ function drawHeatMap (figure, chart, options){
         .on("mousemove", mousemove)
         .on("mouseleave", mouseleave);
 
+    // remove raw data from dom
+    figure.removeData('chart').removeAttr('data-chart');
+
+    // adjust font-size on resize
+    window.onresize = function () {
+        let scale = width / figure.width();
+        svg.selectAll("text")
+            .attr('transform', `scale(${scale} ${scale})`);
+        svg.selectAll("line")
+            .attr('stroke-width', `${scale}px`);
+    }
 }
 
 (function ($) {
