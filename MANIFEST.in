@@ -1,2 +1,2 @@
 include README.md LICENSE
-global-include *.js *.html
+global-include *.js *.html *.css *.json
