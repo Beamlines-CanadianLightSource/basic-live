@@ -1480,8 +1480,7 @@ class AnalysisReport(ActiveStatusMixin):
         ordering = ['created', '-score']
 
     def download_url(self):
-        dataset = self.data.first()
-        return '{}/{}-report-{}.tar.gz'.format(self.url, dataset.name, self.pk)
+        return '{}/{}-report-{}.tar.gz'.format(self.url, self.name, self.pk)
 
     def identity(self):
         return 'RPT-{:07,d}'.format(self.id).replace(',', '-')
