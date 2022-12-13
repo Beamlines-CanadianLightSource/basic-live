@@ -425,6 +425,8 @@ class AddReport(VerificationMixin, View):
     :param details: JSON dict
     :param name: str
     :param beamline: Beamline__acronym
+    optional:
+    :param proposal: Proposal number
 
     :Return: {'id': < Created AnalysisReport.pk >}
 
@@ -445,20 +447,34 @@ class AddReport(VerificationMixin, View):
         except:
             raise http.Http404("Data does not exist")
 
-        # Download  key
+        #Download key
         try:
             key = make_secure_path(info.get('directory'))
         except ValueError:
             return http.HttpResponseServerError("Unable to create SecurePath")
-
-        details = {
-            'project': project,
-            'score': info.get('score') if info.get('score') else 0,
-            'kind': info.get('kind', 'Data Analysis'),
-            'details': info.get('details'),
-            'name': info.get('title'),
-            'url': key
-        }
+        if LIMS_USE_PROPOSAL:
+            try:
+                proposal = Proposal.objects.get(name__exact=info.get('proposal'))
+            except ValueError:
+                raise http.Http404("Proposal does not exist")
+            details = {
+                'project': project,
+                'score': info.get('score') if info.get('score') else 0,
+                'kind': info.get('kind', 'Data Analysis'),
+                'details': info.get('details'),
+                'name': info.get('title'),
+                'url': key,
+                'proposal': proposal
+            }
+        else:
+            details = {
+                'project': project,
+                'score': info.get('score') if info.get('score') else 0,
+                'kind': info.get('kind', 'Data Analysis'),
+                'details': info.get('details'),
+                'name': info.get('title'),
+                'url': key
+            }
         report = AnalysisReport.objects.filter(pk=info.get('id')).first()
 
         if report:
