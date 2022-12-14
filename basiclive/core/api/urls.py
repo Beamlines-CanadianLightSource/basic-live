@@ -19,8 +19,9 @@ urlpatterns = [
 
 
 if settings.LIMS_USE_PROPOSAL:
-    keyed_url(r'^propsamples/(?P<proposal>[\w_-]+)/$', views.ProposalSamples.as_view(), name='proposal-samples'),
-    keyed_url(r'^propdata/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)/$', views.ProposalDataSets.as_view(), name='proposal-dataset')
+    keyed_url(r'^proposal/$', views.ProposalList.as_view(), name='proposal-list'),
+    keyed_url(r'^proposal/samples/(?P<proposal>[\w_-]+)/$', views.ProposalSamples.as_view(), name='proposal-samples'),
+    keyed_url(r'^proposal/data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)/$', views.ProposalDataSets.as_view(), name='proposal-dataset')
     urlpatterns += [keyed_url(r'^launch/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)/(?P<proposal>[\w_-]+)/$',
                               views.LaunchProposalSession.as_view(), name='session-launch'),
                     keyed_url(r'^samples/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)//$',
