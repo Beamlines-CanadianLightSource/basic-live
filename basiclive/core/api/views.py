@@ -678,5 +678,5 @@ class ProposalList(VerificationMixin, View):
             raise http.Http404("Project does not exist.")
 
         proposal_list = project.proposals.filter(active=True).order_by('modified').values()
-        names = [obj.name for obj in proposal_list]
+        names = [obj['name'] for obj in proposal_list]
         return JsonResponse(names, safe=False)
