@@ -666,3 +666,17 @@ class ProposalDataSets(VerificationMixin, View):
         samples = [prep_sample(data, priority=i) for i, data in enumerate(data_list)]
         return JsonResponse(samples, safe=False)
 
+
+class ProposalList(VerificationMixin, View):
+
+    def get(self, request, *args, **kwargs):
+        project_name = kwargs.get('username')
+
+        try:
+            project = Project.objects.get(username__exact=project_name)
+        except Project.DoesNotExist:
+            raise http.Http404("Project does not exist.")
+
+        proposal_list = project.proposals.filter(active=True).order_by('modified').values()
+        names = [obj.name for obj in proposal_list]
+        return JsonResponse(names, safe=False)
