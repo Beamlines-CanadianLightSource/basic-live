@@ -285,89 +285,6 @@ def prep_sample(info, **kwargs):
     sample.update(**kwargs)
     return sample
 
-class ProposalSampleMount(VerificationMixin, View):
-    """
-    :param name: samplename
-    :param barcode: int
-    :param container: str
-    :param comments: str
-    :param priority: int
-
-    :Return: sample mounted.
-
-    :key: r'^(?P<signature>(?P<username>):.+)/samples/(?P<beamline>)/(?P<session>)$'
-
-    """
-
-    def post(self, request, *args, **kwargs):
-        info = msgpack.loads(request.body, raw=False)
-
-        project_name = kwargs.get('username')
-        beamline_name = kwargs.get('beamline')
-        session_key = kwargs.get('session')
-
-        try:
-            project = Project.objects.get(username__exact=project_name)
-        except Project.DoesNotExist:
-            raise http.Http404("Project does not exist.")
-
-        try:
-            session = Session.objects.get(name__exact=session_key)
-            proposal = session.proposal
-        except Session.DoesNotExist:
-            raise http.Http404("No session by that name.")
-
-        try:
-            beamline = Beamline.objects.get(acronym=beamline_name)
-        except Beamline.DoesNotExist:
-            raise http.Http404("No beamline by that name.")
-
-        try:
-            automounter = Automounter.objects.filter(beamline=beamline).select_related('container').get(active=True)
-        except Automounter.DoesNotExist:
-            automounter = None
-
-        try:
-            group = proposal.groups().get(group__name=info.get('name'))
-        except:
-            group = None
-
-        if not automounter:
-            now = timezone.now()
-            one_month_ago = now - timedelta(days=30)
-            container = proposal.containers.filter(status=Container.STATES.ON_SITE, modified__gte=one_month_ago).first()
-        else:
-            container = automounter.container
-
-
-        if not group:
-            group_details = {
-                'name': info.get('name'),
-                'proposal': proposal,
-                'project': project,
-                'priority': info.get('priority'),
-                'comments': f"Created on the fly during {session_key}",
-            }
-            if container:
-                group_details.update({ 'shipment': container.shipment,})
-            group = Group.objects.get_or_create(**group_details)
-
-        details = {
-            'name': f"{info.get('name')}_{group.num_samples() + 1}",
-            'group': group,
-            'project': project,
-            'priority': info.get('priority'),
-            'proposal': proposal,
-            'collect_status': True,
-            'comments': info.get("comments", f"Created on the fly during {session_key}"),
-            'barcode': info.get('barcode')
-        }
-        if container:
-            details.update({"container": container})
-
-        sample = Sample.objects.get_or_create(**details)
-        return JsonResponse(prep_sample(sample), safe=False)
-
 
 
 class ProjectSamples(VerificationMixin, View):
@@ -641,12 +558,11 @@ class ProposalDataSets(VerificationMixin, View):
 
     :key: r'^(?P<signature>(?P<username>):.+)/dataset/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)$'
     """
-
-    def get(self, request, *args, **kwargs):
+    def check_instance(self, *args, **kwargs):
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
         sample_id = kwargs.get('sample')
-        kind = kwargs.get('kind')
+        acro = kwargs.get('kind')
 
         try:
             project = Project.objects.get(username__exact=project_name)
@@ -661,10 +577,30 @@ class ProposalDataSets(VerificationMixin, View):
         except Proposal.DoesNotExist:
             raise http.Http404("Proposal does not exist.")
 
+        try:
+            kind = DataType.objects.filter(acronym=acro).first()
+        except DataType.DoesNotExist:
+            raise http.Http404("Not a valid datatype")
 
-        data_list = p.datasets.filter(sample_id=sample_id).order_by('end_time').values()
+        return project, p, kind, sample_id
+
+    def get(self, request, *args, **kwargs):
+        project, p, kind, sample_id = self.check_instance(*args, **kwargs)
+
+        data_list = p.datasets.filter(sample_id=sample_id, kind=kind).order_by('end_time').values()
         samples = [prep_sample(data, priority=i) for i, data in enumerate(data_list)]
         return JsonResponse(samples, safe=False)
+
+    def post(self, request, *args, **kwargs):
+        info = msgpack.loads(request.body, raw=False)
+        data_id = info.get('id')
+        project, p, kind, sample_id = self.check_instance(*args, **kwargs)
+
+        if data_id:
+            data = p.datasets.filter(id=data_id).values('id', 'url', 'frames', 'end_time')
+            if len(data):
+                return JsonResponse(data[0], safe=False)
+        raise http.Http404("No data found matching that id.")
 
 
 class ProposalList(VerificationMixin, View):
