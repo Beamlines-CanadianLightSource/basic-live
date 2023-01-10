@@ -451,7 +451,7 @@ class AddData(VerificationMixin, View):
         # Download  key
         try:
             if LIMS_USE_PROPOSAL:
-                key = make_secure_path(info.get('directory') + 'raw/')
+                key = info.get('directory') + 'raw/'
             else:
                 key = make_secure_path(info.get('directory'))
         except ValueError:
@@ -471,7 +471,6 @@ class AddData(VerificationMixin, View):
                 'project': project,
                 'proposal': proposal,
                 'beamline': beamline,
-                'file_name': info.get('directory'),
                 'url': key,
                 'sample': sample,
                 'group': sample and sample.group or None,
