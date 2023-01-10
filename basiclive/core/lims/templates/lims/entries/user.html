@@ -27,7 +27,7 @@
     </a>
     {% if use_proposal %}
     <a class="pull-right" href="{% url 'proposal-list' %}?search={{ object.username }}" title="Go to Proposals for {{ object.username }}">
-        {% show_icon label="Sessions" icon="ti ti-md ti-calendar" badge=object.proposals.count %}
+        {% show_icon label="Proposals" icon="ti ti-md ti-calendar" badge=object.proposals.count %}
     </a>
     {% endif %}
     <a class="pull-right" href="{% url 'session-list' %}?search={{ object.username }}" title="Go to Sessions for {{ object.username }}">
