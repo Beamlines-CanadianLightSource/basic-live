@@ -451,7 +451,7 @@ class AddData(VerificationMixin, View):
         # Download  key
         try:
             if LIMS_USE_PROPOSAL:
-                key = info.get('directory') + 'raw/'
+                key = info.get('directory')
             else:
                 key = make_secure_path(info.get('directory'))
         except ValueError:
