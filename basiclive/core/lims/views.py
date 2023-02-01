@@ -28,7 +28,7 @@ DOWNLOAD_PROXY_URL = getattr(settings, 'DOWNLOAD_PROXY_URL', "http://basiclive.c
 LIMS_USE_SCHEDULE = getattr(settings, 'LIMS_USE_SCHEDULE', False)
 LIMS_USE_ACL = getattr(settings, 'LIMS_USE_ACL', False)
 LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
-
+CERT_KEY = getattr(settings, 'DOWNLOAD_PROXY_CERT', False)
 
 if LIMS_USE_SCHEDULE:
     from basiclive.core.schedule.models import AccessType, BeamlineSupport, Beamtime
@@ -1753,11 +1753,16 @@ class ProxyView(View):
         remote_url = DOWNLOAD_PROXY_URL + request.path
         if kwargs.get('section') == 'archive':
             return fetch_archive(request, remote_url)
+        if CERT_KEY:
+            return proxy_view(request, remote_url, requests_args={'verify': CERT_KEY})
         return proxy_view(request, remote_url)
 
 
 def fetch_archive(request, url):
-    r = requests.get(url, stream=True)
+    if CERT_KEY:
+        r = requests.get(url, stream=True, verify=CERT_KEY)
+    else:
+        r = requests.get(url, stream=True)
     if r.status_code == 200:
         resp = http.StreamingHttpResponse(r, content_type='application/x-gzip')
         resp['Content-Disposition'] = r.headers.get('Content-Disposition', 'attachment; filename=archive.tar.gz')
