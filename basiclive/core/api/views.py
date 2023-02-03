@@ -155,7 +155,9 @@ class LaunchProposalSession(VerificationMixin, View):
         if created:
             # Download  key
             try:
-                key = make_secure_path(os.path.join(f"prj{proposal}", "preprocessed", session.name))
+                #prepended with default path for loki, assuming beamline_name should be split on hyphens.
+                #may need to revisit this later.
+                key = make_secure_path(os.path.join(f"/beamlinedata/{beamline_name.split('-')[0]}/projects/prj{proposal.name}", "preprocessed", session.name))
                 session.url = key
                 session.save()
             except ValueError:
@@ -316,10 +318,19 @@ class ProjectSamples(VerificationMixin, View):
             functools.reduce(operator.and_, [Q(**{"{}__isnull".format(lookup):True}) for lookup in lookups])
         )
 
-        sample_list = project.samples.filter(query).order_by('group__priority', 'priority').values(
-            'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
-            'location__name', 'container__location__name', 'port_name'
-        )
+        if LIMS_USE_PROPOSAL:
+            proposal = automounter.container.proposal
+            if not proposal.is_team_member(project):
+                return http.HttpResponseForbidden()
+            sample_list = proposal.samples.filter(query).order_by('group__priority', 'priority').values(
+                'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+                'location__name', 'container__location__name', 'port_name'
+            )
+        else:
+            sample_list = project.samples.filter(query).order_by('group__priority', 'priority').values(
+                'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+                'location__name', 'container__location__name', 'port_name'
+            )
         samples = [prep_sample(sample, priority=i) for i, sample in enumerate(sample_list)]
         return JsonResponse(samples, safe=False)
 
@@ -521,15 +532,14 @@ class AddData(VerificationMixin, View):
 
 class ProposalSamples(VerificationMixin, View):
     """
-    :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
+    :Return: Dictionary for each sample owned by the proposal.
 
-    :key: r'^(?P<signature>(?P<username>):.+)/projsamples/(?<proposal>)/$'
+    :key: r'^(?P<signature>(?P<username>):.+)/proposal/samples/(?<proposal>)/$'
     """
 
     def get(self, request, *args, **kwargs):
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
-        active = kwargs.get('active')
         try:
             project = Project.objects.get(username__exact=project_name)
         except Project.DoesNotExist:
@@ -553,9 +563,9 @@ class ProposalSamples(VerificationMixin, View):
 
 class ProposalDataSets(VerificationMixin, View):
     """
-    :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
+    :Return: Dictionary for each dataset owned by the proposal, or one matching a posted primary_key.
 
-    :key: r'^(?P<signature>(?P<username>):.+)/dataset/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)$'
+    :key: r'^(?P<signature>(?P<username>):.+)/proposal/data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)/$'
     """
     def check_instance(self, *args, **kwargs):
         project_name = kwargs.get('username')
