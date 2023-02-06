@@ -17,15 +17,15 @@ from django.utils.encoding import force_str
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
-from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType, Proposal, Group, Sample
+from basiclive.core.lims.models import ActivityLog, Beamline, Container, Automounter, Data, DataType, Proposal, Group, \
+    Sample
 from basiclive.core.lims.models import AnalysisReport, Project, Session
 from basiclive.core.lims.templatetags.converter import humanize_duration
 from basiclive.utils.data import parse_frames
 from basiclive.utils.signing import Signer, InvalidSignature
 
-
 if settings.LIMS_USE_SCHEDULE:
-    HALF_SHIFT = int(getattr(settings, 'HOURS_PER_SHIFT', 8)/2)
+    HALF_SHIFT = int(getattr(settings, 'HOURS_PER_SHIFT', 8) / 2)
 
 PROXY_URL = getattr(settings, 'DOWNLOAD_PROXY_URL', '')
 MAX_CONTAINER_DEPTH = getattr(settings, 'MAX_CONTAINER_DEPTH', 2)
@@ -111,6 +111,7 @@ class UpdateUserKey(View):
 
         return JsonResponse({})
 
+
 class LaunchProposalSession(VerificationMixin, View):
     """
     Method to start an MxLIVE Session from the beamline. If a Session with the same name already exists, a new Stretch
@@ -151,13 +152,16 @@ class LaunchProposalSession(VerificationMixin, View):
             elif not beamline.active:
                 end_time = (timezone.now() + timedelta(hours=2)).isoformat()
         session_name = f"EXP{pk}-" + session_name
-        session, created = Session.objects.get_or_create(project=project, beamline=beamline, proposal=proposal, name=session_name)
+        session, created = Session.objects.get_or_create(project=project, beamline=beamline, proposal=proposal,
+                                                         name=session_name)
         if created:
             # Download  key
             try:
-                #prepended with default path for loki, assuming beamline_name should be split on hyphens.
-                #may need to revisit this later.
-                key = make_secure_path(os.path.join(f"/beamlinedata/{beamline_name.split('-')[0]}/projects/prj{proposal.name}", "preprocessed", session.name))
+                # prepended with default path for loki, assuming beamline_name should be split on hyphens.
+                # may need to revisit this later.
+                key = make_secure_path(
+                    os.path.join(f"/beamlinedata/{beamline_name.split('-')[0]}/projects/prj{proposal.name}",
+                                 "preprocessed", session.name))
                 session.url = key
                 session.save()
             except ValueError:
@@ -169,14 +173,15 @@ class LaunchProposalSession(VerificationMixin, View):
             feedback_url = force_str(reverse_lazy('session-feedback', kwargs={'key': session.feedback_key()}))
 
             session_info = {'session': session.name,
-                        'duration': humanize_duration(session.total_time()),
-                        'survey': request.build_absolute_uri(feedback_url),
-                        'end_time': end_time}
+                            'duration': humanize_duration(session.total_time()),
+                            'survey': request.build_absolute_uri(feedback_url),
+                            'end_time': end_time}
         else:
             session_info = {'session': session.name,
-                        'duration': humanize_duration(session.total_time()),
-                        'end_time': end_time}
+                            'duration': humanize_duration(session.total_time()),
+                            'end_time': end_time}
         return JsonResponse(session_info)
+
 
 class LaunchSession(VerificationMixin, View):
     """
@@ -288,7 +293,6 @@ def prep_sample(info, **kwargs):
     return sample
 
 
-
 class ProjectSamples(VerificationMixin, View):
     """
     :Return: Dictionary for each On-Site sample owned by the User and NOT loaded on another beamline.
@@ -307,15 +311,15 @@ class ProjectSamples(VerificationMixin, View):
 
         try:
             beamline = Beamline.objects.get(acronym=beamline_name)
-            automounter = Automounter.objects.filter(beamline = beamline).select_related('container').get(active=True)
+            automounter = Automounter.objects.filter(beamline=beamline).select_related('container').get(active=True)
         except (Beamline.DoesNotExist, Automounter.DoesNotExist):
             raise http.Http404("Beamline or Automounter does not exist")
 
-        lookups = ['container__{}'.format('__'.join(['parent']*(i+1))) for i in range(MAX_CONTAINER_DEPTH)]
+        lookups = ['container__{}'.format('__'.join(['parent'] * (i + 1))) for i in range(MAX_CONTAINER_DEPTH)]
         query = Q(container__status=Container.STATES.ON_SITE)
         query &= (
-            functools.reduce(operator.or_, [Q(**{lookup:automounter.container}) for lookup in lookups]) |
-            functools.reduce(operator.and_, [Q(**{"{}__isnull".format(lookup):True}) for lookup in lookups])
+                functools.reduce(operator.or_, [Q(**{lookup: automounter.container}) for lookup in lookups]) |
+                functools.reduce(operator.and_, [Q(**{"{}__isnull".format(lookup): True}) for lookup in lookups])
         )
 
         if LIMS_USE_PROPOSAL:
@@ -339,7 +343,6 @@ TRANSFORMS = {
     'file_name': 'filename',
     'exposure_time': 'exposure',
 }
-
 
 
 class AddReport(VerificationMixin, View):
@@ -375,7 +378,7 @@ class AddReport(VerificationMixin, View):
         except:
             raise http.Http404("Data does not exist")
 
-        #Download key
+        # Download key
         try:
             key = make_secure_path(info.get('directory'))
         except ValueError:
@@ -507,7 +510,7 @@ class AddData(VerificationMixin, View):
         # Set start and end time for dataset
         end_time = timezone.now() if 'end_time' not in info else dateparse.parse_datetime(info['end_time'])
         start_time = (
-            end_time - timedelta(seconds=(num_frames*info['exposure_time']))
+                end_time - timedelta(seconds=(num_frames * info['exposure_time']))
         ) if 'start_time' not in info else dateparse.parse_datetime(info['start_time'])
         details.update(start_time=start_time, end_time=end_time)
 
@@ -526,8 +529,6 @@ class AddData(VerificationMixin, View):
         ActivityLog.objects.log_activity(request, data, ActivityLog.TYPE.CREATE, "{} uploaded from {}".format(
             data.kind.name, beamline.acronym))
         return JsonResponse({'id': data.pk})
-
-
 
 
 class ProposalSamples(VerificationMixin, View):
@@ -561,17 +562,44 @@ class ProposalSamples(VerificationMixin, View):
         return JsonResponse(samples, safe=False)
 
 
+DATAKEYS = {
+    'beamline__name': 'endstation',
+    'sample__name': 'sample',
+    'session__name': 'session',
+    'group__name': 'group',
+    'id': 'id',
+    'name': 'name',
+    'file_name': 'directory',
+    'kind__acronym': 'kind',
+    'frames': 'files',
+    'energy': 'energy',
+    'num_frames': 'num_scans',
+    'start_time': 'start',
+    'end_time': 'end',
+}
+
+
+def prep_data(info, **kwargs):
+    data = {
+        DATAKEYS.get(key): value
+        for key, value in info.items()
+    }
+    data.update(**kwargs)
+    return data
+
+
 class ProposalDataSets(VerificationMixin, View):
     """
     :Return: Dictionary for each dataset owned by the proposal, or one matching a posted primary_key.
 
     :key: r'^(?P<signature>(?P<username>):.+)/proposal/data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)/$'
     """
+
     def check_instance(self, *args, **kwargs):
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
         sample_id = kwargs.get('sample')
-        acro = kwargs.get('kind')
+        acro = kwargs.get('kind', None)
 
         try:
             project = Project.objects.get(username__exact=project_name)
@@ -586,29 +614,55 @@ class ProposalDataSets(VerificationMixin, View):
         except Proposal.DoesNotExist:
             raise http.Http404("Proposal does not exist.")
 
-        try:
-            kind = DataType.objects.filter(acronym=acro).first()
-        except DataType.DoesNotExist:
-            raise http.Http404("Not a valid datatype")
+        if acro:
+            try:
+                kind = DataType.objects.filter(acronym=acro).first()
+            except DataType.DoesNotExist:
+                raise http.Http404("Not a valid datatype")
 
         return project, p, kind, sample_id
 
     def get(self, request, *args, **kwargs):
         project, p, kind, sample_id = self.check_instance(*args, **kwargs)
-
-        data_list = p.datasets.filter(sample_id=sample_id, kind=kind).order_by('end_time').values()
-        samples = [prep_sample(data, priority=i) for i, data in enumerate(data_list)]
-        return JsonResponse(samples, safe=False)
+        q = {"sample_id": sample_id}
+        if kind:
+            q.update({"kind": kind})
+        data_list = p.datasets.filter(**q).order_by('end_time') \
+            .values('beamline__name',
+                    'group__name',
+                    'sample__name',
+                    'session_name', 'id',
+                    'name', 'frames',
+                    'kind__acronym',
+                    'file_name',
+                    'energy',
+                    'end_time',
+                    'start_time',
+                    'num_frames')
+        data = [prep_data(data, order=i) for i, data in enumerate(data_list)]
+        return JsonResponse(data, safe=False)
 
     def post(self, request, *args, **kwargs):
         info = msgpack.loads(request.body, raw=False)
         data_id = info.get('id')
         project, p, kind, sample_id = self.check_instance(*args, **kwargs)
-
+        q = {"sample_id": sample_id, "id": data_id}
+        if kind:
+            q.update({"kind": kind})
         if data_id:
-            data = p.datasets.filter(id=data_id).values('id', 'url', 'frames', 'end_time')
+            data = p.datasets.filter(**q).values('beamline__name',
+                                                        'group__name',
+                                                        'sample__name',
+                                                        'session_name', 'id',
+                                                        'name', 'frames',
+                                                        'kind__acronym',
+                                                        'file_name',
+                                                        'energy',
+                                                        'end_time',
+                                                        'start_time',
+                                                        'num_frames')
             if len(data):
-                return JsonResponse(data[0], safe=False)
+                return JsonResponse(prep_data(data[0]), safe=False)
         raise http.Http404("No data found matching that id.")
 
 
