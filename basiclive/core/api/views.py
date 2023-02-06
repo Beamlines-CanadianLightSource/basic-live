@@ -619,6 +619,8 @@ class ProposalDataSets(VerificationMixin, View):
                 kind = DataType.objects.filter(acronym=acro).first()
             except DataType.DoesNotExist:
                 raise http.Http404("Not a valid datatype")
+        else:
+            kind = None
 
         return project, p, kind, sample_id
 
