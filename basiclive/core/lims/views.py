@@ -1711,6 +1711,24 @@ class GuideDelete(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.
         context['form_action'] = reverse_lazy('guide-delete', kwargs={'pk': self.object.pk})
         return context
 
+class ProposalCreate(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.CreateView):
+    form_class = forms.NewProposalForm
+    template_name = "modal/form.html"
+    model = models.Proposal
+    success_url = reverse_lazy('proposal-list')
+    success_message = "New Proposal '%(name)s' has been created."
+
+    def form_valid(self, form):
+        # create local user
+        response = super().form_valid(form)
+        info_msg = 'New Proposal {} added'.format(self.object)
+
+        models.ActivityLog.objects.log_activity(
+            self.request, self.object, models.ActivityLog.TYPE.CREATE, info_msg
+        )
+        # messages are simply passed down to the template via the request context
+        return response
+
 class ProposalListView(LoginRequiredMixin, ItemListView):
     model = models.Proposal
     template_name = "lims/list.html"
@@ -1719,6 +1737,7 @@ class ProposalListView(LoginRequiredMixin, ItemListView):
     list_search = ['name', 'team_members__name']
     link_field = 'name'
     link_url = 'proposal-detail'
+    add_url = 'new-proposal'
     ordering = ['-modified']
     paginate_by = 25
 

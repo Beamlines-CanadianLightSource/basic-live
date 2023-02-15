@@ -192,6 +192,8 @@ class Project(AbstractUser):
     def save(self, *args, **kwargs):
         if not self.kind:
             self.kind = ProjectType.objects.first()
+        if not self.name:
+            self.name = self.username
         super().save(*args, **kwargs)
 
     class Meta:

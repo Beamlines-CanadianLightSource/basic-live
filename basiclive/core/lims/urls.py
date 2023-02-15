@@ -126,6 +126,7 @@ urlpatterns = [
 if LIMS_USE_PROPOSAL:
     urlpatterns += [
         path('proposals/', views.ProposalListView.as_view(), name='proposal-list'),
+        path('proposals/new/', views.ProposalCreate.as_view(), name='new-proposal'),
         path('proposals/<int:pk>', views.ProposalDetail.as_view(), name='proposal-detail'),
         path('proposals/<int:pk>/history/', views.ProposalDetail.as_view(template_name="lims/entries/proposal-history.html"), name='proposal-history'),
         path('proposals/<int:pk>/data/', views.ProposalDataList.as_view(), name='proposal-data'),

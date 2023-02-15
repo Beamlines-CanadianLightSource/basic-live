@@ -14,8 +14,8 @@ class ProjectAdmin(admin.ModelAdmin):
 
 
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('name', 'contact_person', 'email')
-    search_fields = ('name', 'contact_person')
+    list_display = ('username', 'contact_person', 'email')
+    search_fields = ('username', 'contact_person')
 
 class LocationAdmin(admin.ModelAdmin):
     list_filter = ('kind',)

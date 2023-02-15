@@ -175,6 +175,39 @@ class NewProjectForm(forms.ModelForm):
             StrictButton('Save', type='submit', name="submit", value='submit', css_class='btn btn-primary'),
         )
 
+class NewProposalForm(forms.ModelForm):
+    team_members = forms.ModelMultipleChoiceField(label='Members of proposal',
+                                                queryset=Project.objects.all(),
+                                                required=True)
+    class Meta:
+        model = Proposal
+        fields = ('name', 'team_members', 'kind')
+
+    def __init__(self, *args, **kwargs):
+        super(NewProposalForm, self).__init__(*args, **kwargs)
+
+        self.fields['kind'].initial = ProjectType.objects.first()
+        self.body = BodyHelper(self)
+        self.footer = FooterHelper(self)
+
+        self.body.title = _("Create New Proposal")
+        self.body.form_action = reverse_lazy('new-proposal')
+        self.footer.layout = Layout()
+        self.body.layout = Layout(
+            Div(
+                Div('name', css_class='col-6'),
+                Div(Field('kind', css_class="select"), css_class='col-6'),
+                css_class="form-row"
+            ),
+            Div(
+                Field('team_members', css_class='select'),
+                css_class="form-row"
+            ),
+        )
+        self.footer.layout = Layout(
+            StrictButton('Save', type='submit', name="submit", value='submit', css_class='btn btn-primary'),
+        )
+
 
 class RequestTypeForm(forms.ModelForm):
     parameter = forms.CharField(max_length=32, required=False, label=_("Field*"))
