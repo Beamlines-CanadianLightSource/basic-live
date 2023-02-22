@@ -1254,13 +1254,15 @@ class AddShipmentForm(forms.ModelForm):
             self.fields['proposal'].queryset = self.initial['project'].proposals.filter(active=True)
         if self.initial['project'].is_superuser:
             if LIMS_USE_PROPOSAL:
+                self.fields['proposal'].queryset = Proposal.objects.all()
+                self.fields['project'].widget = forms.HiddenInput()
                 name_row = Div(
                     Div(
-                        Div(Field('project', css_class="select"), css_class="col-4"),
+                        Div(Field('project', hidden=True)),
                         Div(Field('proposal', css_class="select"), css_class="col-4"),
+                        Div('name', css_class="col-8"),
                         css_class="form-row"
                     ),
-                    Div('name', css_class="col-8"),
                 )
             else:
                 name_row = Div(

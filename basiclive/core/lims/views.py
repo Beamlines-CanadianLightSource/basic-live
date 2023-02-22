@@ -1423,10 +1423,18 @@ class ShipmentCreate(LoginRequiredMixin, SessionWizardView):
             if label == 'shipment':
                 data = form.cleaned_data
                 if self.request.user.is_superuser:
-                    data.update({
-                        'project': data.get('project'),
-                        'staff_comments': 'Created by staff!'
-                    })
+                    if LIMS_USE_PROPOSAL:
+                        proposal = data.get('proposal')
+
+                        data.update({
+                            'project': proposal.team_members.first(),
+                            'staff_comments': 'Created by staff!'
+                        })
+                    else:
+                        data.update({
+                            'project': data.get('project'),
+                            'staff_comments': 'Created by staff!'
+                        })
                 else:
                     data.update({
                         'project': self.request.user
