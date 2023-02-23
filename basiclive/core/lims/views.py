@@ -1739,7 +1739,7 @@ class ProposalCreate(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, ed
 
 class ProposalListView(LoginRequiredMixin, ItemListView):
     model = models.Proposal
-    template_name = "lims/list.html"
+    template_name = "lims/proposal-list.html"
     list_filters = ['modified', 'kind']
     list_columns = ['id', 'name', 'members', 'kind', 'modified', 'active']
     list_search = ['name', 'team_members__name']
