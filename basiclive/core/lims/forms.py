@@ -200,7 +200,7 @@ class NewProposalForm(forms.ModelForm):
                 css_class="form-row"
             ),
             Div(
-                Field('team_members', css_class='select'),
+                Div(Field('team_members', css_class='select'), css_class='col-12'),
                 css_class="form-row"
             ),
         )
