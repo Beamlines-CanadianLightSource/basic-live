@@ -175,7 +175,7 @@ class NewProjectForm(forms.ModelForm):
             StrictButton('Save', type='submit', name="submit", value='submit', css_class='btn btn-primary'),
         )
 
-class NewProposalForm(forms.ModelForm):
+class ProposalForm(forms.ModelForm):
     team_members = forms.ModelMultipleChoiceField(label='Members of proposal',
                                                 queryset=Project.objects.all(),
                                                 required=True)
@@ -184,14 +184,18 @@ class NewProposalForm(forms.ModelForm):
         fields = ('name', 'team_members', 'kind')
 
     def __init__(self, *args, **kwargs):
-        super(NewProposalForm, self).__init__(*args, **kwargs)
+        super(ProposalForm, self).__init__(*args, **kwargs)
+        pk = self.instance.pk
 
         self.fields['kind'].initial = ProjectType.objects.first()
         self.body = BodyHelper(self)
         self.footer = FooterHelper(self)
-
-        self.body.title = _("Create New Proposal")
-        self.body.form_action = reverse_lazy('new-proposal')
+        if pk:
+            self.body.title = u"Edit Proposal"
+            self.body.form_action = reverse_lazy('proposal-edit', kwargs={'pk': pk})
+        else:
+            self.body.title = _("Create New Proposal")
+            self.body.form_action = reverse_lazy('new-proposal')
         self.footer.layout = Layout()
         self.body.layout = Layout(
             Div(

@@ -1721,7 +1721,7 @@ class GuideDelete(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.
 
 
 class ProposalEdit(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.UpdateView):
-    form_class = forms.NewProposalForm
+    form_class = forms.ProposalForm
     template_name = "modal/form.html"
     model = models.Proposal
     success_url = reverse_lazy('proposal-list')
@@ -1729,7 +1729,7 @@ class ProposalEdit(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit
 
 
 class ProposalCreate(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.CreateView):
-    form_class = forms.NewProposalForm
+    form_class = forms.ProposalForm
     template_name = "modal/form.html"
     model = models.Proposal
     success_url = reverse_lazy('proposal-list')
