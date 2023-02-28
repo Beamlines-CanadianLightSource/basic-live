@@ -44,7 +44,7 @@
         </a>
     {% endif %}
     {% if user.is_superuser %}
-        <a href="#!0" data-form-link="{% url 'proposal-edit' %}" title="Edit">
+        <a href="#!0" data-form-link="{% url 'proposal-edit' object.pk %}" title="Edit">
             {% show_icon label='Edit Proposal' icon='ti ti-md ti-pencil' %}
         </a>
     {% endif %}
