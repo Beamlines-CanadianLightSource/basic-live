@@ -19,7 +19,6 @@ from formtools.wizard.views import SessionWizardView
 from itemlist.views import ItemListView
 from proxy.views import proxy_view
 
-
 from basiclive.utils import filters
 from basiclive.utils.mixins import AsyncFormMixin, AdminRequiredMixin, HTML2PdfMixin, PlotViewMixin
 from . import forms, models, stats
@@ -84,15 +83,15 @@ class ProjectDetail(UserPassesTestMixin, detail.DetailView):
             for i, p in enumerate(props):
                 if i == 0:
                     shipments = p.shipments.filter(
-                                        Q(status__lt=models.Shipment.STATES.RETURNED)
-                                        | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
-                                    ).annotate(
-                                        data_count=Count('containers__samples__datasets', distinct=True),
-                                        report_count=Count('containers__samples__datasets__reports', distinct=True),
-                                        sample_count=Count('containers__samples', distinct=True),
-                                        group_count=Count('groups', distinct=True),
-                                        container_count=Count('containers', distinct=True),
-                                    ).order_by('status', '-date_shipped', '-created').prefetch_related('proposal')
+                        Q(status__lt=models.Shipment.STATES.RETURNED)
+                        | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
+                    ).annotate(
+                        data_count=Count('containers__samples__datasets', distinct=True),
+                        report_count=Count('containers__samples__datasets__reports', distinct=True),
+                        sample_count=Count('containers__samples', distinct=True),
+                        group_count=Count('groups', distinct=True),
+                        container_count=Count('containers', distinct=True),
+                    ).order_by('status', '-date_shipped', '-created').prefetch_related('proposal')
 
                     sessions = p.sessions.filter(
                         created__gt=one_year_ago
@@ -125,7 +124,7 @@ class ProjectDetail(UserPassesTestMixin, detail.DetailView):
                             last_record=Max('datasets__end_time'),
                             end=Max('stretches__end')
                         ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project',
-                                                                            'beamline')[:7]
+                                                                                                       'beamline')[:7]
                     )
 
         else:
@@ -156,8 +155,6 @@ class ProjectDetail(UserPassesTestMixin, detail.DetailView):
                 current=Case(When(start__lte=now, then=Value(True)), default=Value(False), output_field=BooleanField())
             ).order_by('-current', 'start')
             context.update(beamtimes=beamtimes, access_types=access_types)
-
-
 
         context.update(shipments=shipments, sessions=sessions)
         return context
@@ -249,7 +246,8 @@ class StaffDashboard(AdminRequiredMixin, detail.DetailView):
             })
         # Users remotely connected, but not scheduled and without an active session
         if LIMS_USE_ACL:
-            for user in active_access.exclude(pk__in=[c.pk for c in connections]).values_list('user', flat=True).distinct():
+            for user in active_access.exclude(pk__in=[c.pk for c in connections]).values_list('user',
+                                                                                              flat=True).distinct():
                 user_conns = active_access.exclude(pk__in=[c.pk for c in connections]).filter(user__pk=user)
                 access_info.append({
                     'user': models.Project.objects.get(pk=user),
@@ -263,7 +261,8 @@ class StaffDashboard(AdminRequiredMixin, detail.DetailView):
             access_info[i]['shipments'] = shipments.filter(project=conn['user']).count()
             access_info[i]['connections'] = LIMS_USE_ACL and {
                 access.name: access_info[i]['connections'].filter(userlist=access)
-                for access in AccessList.objects.filter(pk__in=access_info[i]['connections'].values_list('userlist__pk', flat=True)).distinct()
+                for access in AccessList.objects.filter(
+                    pk__in=access_info[i]['connections'].values_list('userlist__pk', flat=True)).distinct()
             } or {}
 
         context.update(connections=access_info, adaptors=adaptors, shipments=shipments, beamlines=beamlines)
@@ -274,7 +273,7 @@ class ProjectReset(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit
     template_name = "lims/forms/project-reset.html"
     model = models.Project
     success_message = "Account API key reset"
-    fields = ("key", )
+    fields = ("key",)
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -325,8 +324,9 @@ class OwnerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         if LIMS_USE_PROPOSAL:
             if not hasattr(self.get_object(), 'proposal'):
-                return  self.request.user.is_superuser or self.get_object().is_team_member(self.request.user)
-            return self.request.user.is_superuser or getattr(self.get_object(), 'proposal').is_team_member(self.request.user)
+                return self.request.user.is_superuser or self.get_object().is_team_member(self.request.user)
+            return self.request.user.is_superuser or getattr(self.get_object(), 'proposal').is_team_member(
+                self.request.user)
         return self.request.user.is_superuser or getattr(self.get_object(), self.owner_field) == self.request.user
 
 
@@ -668,7 +668,6 @@ class RequestTypeLayout(RequestTypeEdit):
     template_name = "lims/forms/add-wizard.html"
 
 
-
 class RequestTypeView(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.UpdateView):
     form_class = forms.RequestParameterForm
     template_name = "modal/form.html"
@@ -986,14 +985,14 @@ class DataList(ListViewMixin, ItemListView):
 
 
 class DataStats(PlotViewMixin, DataList):
-    plot_fields = { 'beam_size': {'kind': 'pie'},
-                    'kind__name': {'kind': 'columnchart'},
-                    'reports__score': {'kind': 'histogram', 'range': (0.01, 1)},
-                    'energy': {'kind': 'histogram', 'range': (4., 18.), 'bins': 8},
-                    'exposure_time': {'kind': 'histogram', 'range': (0.01, 20)},
-                    'attenuation': {'kind': 'histogram'},
-                    'num_frames': {'kind': 'histogram'},
-                    }
+    plot_fields = {'beam_size': {'kind': 'pie'},
+                   'kind__name': {'kind': 'columnchart'},
+                   'reports__score': {'kind': 'histogram', 'range': (0.01, 1)},
+                   'energy': {'kind': 'histogram', 'range': (4., 18.), 'bins': 8},
+                   'exposure_time': {'kind': 'histogram', 'range': (0.01, 20)},
+                   'attenuation': {'kind': 'histogram'},
+                   'num_frames': {'kind': 'histogram'},
+                   }
     date_field = 'modified'
     list_url = reverse_lazy("data-list")
 
@@ -1212,7 +1211,7 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
                 for field in ['groups', 'samples']:
                     related[field] = info.pop(field)
                 info.pop('template')
-                info.update({'project': models.Project.objects.get(username=self.request.user.username),})
+                info.update({'project': models.Project.objects.get(username=self.request.user.username), })
             elif label == 'parameters':
                 request = info.pop('request')
                 if not request:
@@ -1295,7 +1294,8 @@ class RequestDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edi
         super().delete(request, *args, **kwargs)
         models.ActivityLog.objects.log_activity(self.request, obj, models.ActivityLog.TYPE.DELETE,
                                                 self.success_message)
-        return JsonResponse({'url': obj.shipment() and obj.shipment().get_absolute_url() or reverse_lazy('request-list')})
+        return JsonResponse(
+            {'url': obj.shipment() and obj.shipment().get_absolute_url() or reverse_lazy('request-list')})
 
 
 class SessionDataList(ShipmentDataList):
@@ -1455,7 +1455,7 @@ class ShipmentCreate(LoginRequiredMixin, SessionWizardView):
                 proposal = self.shipment.proposal
                 if self.request.POST.get('submit') == 'Fill':
                     for i, container in enumerate(self.shipment.containers.all()):
-                        group = self.shipment.groups.create(name=container.name, project=project, priority=(i+1),
+                        group = self.shipment.groups.create(name=container.name, project=project, priority=(i + 1),
                                                             proposal=proposal)
                         group_samples = [
                             models.Sample(
@@ -1719,6 +1719,15 @@ class GuideDelete(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.
         context['form_action'] = reverse_lazy('guide-delete', kwargs={'pk': self.object.pk})
         return context
 
+
+class ProposalEdit(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.UpdateView):
+    form_class = forms.NewProposalForm
+    template_name = "modal/form.html"
+    model = models.Proposal
+    success_url = reverse_lazy('proposal-list')
+    success_message = "Proposal has been updated"
+
+
 class ProposalCreate(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.CreateView):
     form_class = forms.NewProposalForm
     template_name = "modal/form.html"
@@ -1737,6 +1746,7 @@ class ProposalCreate(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, ed
         # messages are simply passed down to the template via the request context
         return response
 
+
 class ProposalListView(LoginRequiredMixin, ItemListView):
     model = models.Proposal
     template_name = "lims/proposal-list.html"
@@ -1749,7 +1759,6 @@ class ProposalListView(LoginRequiredMixin, ItemListView):
     ordering = ['-modified']
     paginate_by = 25
 
-
     def get_queryset(self):
         selector = {}
         if not self.request.user.is_superuser:
@@ -1761,19 +1770,23 @@ class ProposalListView(LoginRequiredMixin, ItemListView):
                 selector = {'project': self.request.user}
         return super().get_queryset().filter(**selector)
 
+
 class ProposalDetail(OwnerRequiredMixin, detail.DetailView):
     model = models.Proposal
     template_name = "lims/entries/proposal.html"
+
 
 class ProposalDataList(ShipmentDataList):
     template_name = "lims/entries/proposal-data.html"
     lookup = 'proposal__pk'
     detail_model = models.Proposal
 
+
 class ProposalReportList(ShipmentReportList):
     template_name = "lims/entries/proposal-reports.html"
     lookup = 'data__proposal__pk'
     detail_model = models.Proposal
+
 
 class ProxyView(View):
     def get(self, request, *args, **kwargs):
@@ -1878,13 +1891,15 @@ class ProjectDelete(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edi
 
 def record_logout(sender, user, request, **kwargs):
     """ user logged outof the system """
-    models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGOUT, '{} logged-out'.format(user.username))
+    models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGOUT,
+                                            '{} logged-out'.format(user.username))
 
 
 def record_login(sender, user, request, **kwargs):
     """ Login a user into the system """
     if user.is_authenticated:
-        models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGIN, '{} logged-in'.format(user.username))
+        models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGIN,
+                                                '{} logged-in'.format(user.username))
         last_login = models.ActivityLog.objects.last_login(request)
         if last_login is not None:
             last_host = last_login.ip_number

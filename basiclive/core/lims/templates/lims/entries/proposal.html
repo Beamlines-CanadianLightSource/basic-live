@@ -43,6 +43,11 @@
             {% show_icon label='Feedback' icon='ti ti-md ti-star' %}
         </a>
     {% endif %}
+    {% if user.is_superuser %}
+        <a href="#!0" data-form-link="{% url 'proposal-edit' %}" title="Edit">
+            {% show_icon label='Edit Proposal' icon='ti ti-md ti-pencil' %}
+        </a>
+    {% endif %}
 {% endblock %}
 
 {% block object_status %}
