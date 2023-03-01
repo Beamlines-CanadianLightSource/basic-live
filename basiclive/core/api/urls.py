@@ -22,8 +22,8 @@ if settings.LIMS_USE_PROPOSAL:
     urlpatterns += [
         keyed_url(r'^proposal/$', views.ProposalList.as_view(), name='proposal-list'),
         keyed_url(r'^proposal-sample/(?P<proposal>[\w_-]+)/$', views.ProposalSamples.as_view(), name='proposal-samples'),
-        keyed_url(r'^proposal-data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)/$',
-                  views.ProposalDataSets.as_view(), name='proposal-dataset'),
+        keyed_url(r'^proposal-data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/$',
+                  views.ProposalDataSets.as_view(), name='proposal-data'),
         keyed_url(r'^launch/(?P<beamline>[\w_-]+)/(?P<session>[\w_-]+)/(?P<proposal>[\w_-]+)/$',
                                   views.LaunchProposalSession.as_view(), name='session-launch'),
 

@@ -592,7 +592,7 @@ class ProposalDataSets(VerificationMixin, View):
     """
     :Return: Dictionary for each dataset owned by the proposal, or one matching a posted primary_key.
 
-    :key: r'^(?P<signature>(?P<username>):.+)/proposal/data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/(?P<kind>[\w_-]+)/$'
+    :key: r'^(?P<signature>(?P<username>):.+)/proposal/data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/$'
     """
 
     def check_instance(self, *args, **kwargs):
@@ -625,6 +625,7 @@ class ProposalDataSets(VerificationMixin, View):
         return project, p, kind, sample_id
 
     def get(self, request, *args, **kwargs):
+        kwargs.update(request.GET.dict())
         project, p, kind, sample_id = self.check_instance(*args, **kwargs)
         q = {"sample_id": sample_id}
         if kind:
@@ -647,6 +648,7 @@ class ProposalDataSets(VerificationMixin, View):
     def post(self, request, *args, **kwargs):
         info = msgpack.loads(request.body, raw=False)
         data_id = info.get('id')
+        kwargs.update(request.GET.dict())
         project, p, kind, sample_id = self.check_instance(*args, **kwargs)
         q = {"sample_id": sample_id, "id": data_id}
         if kind:
