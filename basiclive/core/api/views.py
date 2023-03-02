@@ -539,6 +539,7 @@ class ProposalSamples(VerificationMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
+        sample_name = request.GET.get('name', None)
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
         try:
@@ -554,10 +555,16 @@ class ProposalSamples(VerificationMixin, View):
         except Proposal.DoesNotExist:
             raise http.Http404("Proposal does not exist.")
 
-        sample_list = p.samples.filter(collect_status=True).order_by('group__priority', 'priority').values(
-            'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+        if sample_name:
+            sample_list = p.samples.filter(collect_status=True, group__name__contains=sample_name).order_by('group__priority', 'priority').values(
+                'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
 
-        )
+            )
+        else:
+            sample_list = p.samples.filter(collect_status=True).order_by('group__priority', 'priority').values(
+                'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+
+            )
         samples = [prep_sample(sample, index=i) for i, sample in enumerate(sample_list)]
         return JsonResponse(samples, safe=False)
 
@@ -592,7 +599,7 @@ class ProposalDataSets(VerificationMixin, View):
     """
     :Return: Dictionary for each dataset owned by the proposal, or one matching a posted primary_key.
 
-    :key: r'^(?P<signature>(?P<username>):.+)/proposal/data/(?P<proposal>[\w_-]+)/(?P<sample>[\w_-]+)/$'
+    :key: r'^(?P<signature>(?P<username>):.+)/proposal/data/(?P<proposal>[\w_-]+)/$'
     """
 
     def check_instance(self, *args, **kwargs):
@@ -627,7 +634,9 @@ class ProposalDataSets(VerificationMixin, View):
     def get(self, request, *args, **kwargs):
         kwargs.update(request.GET.dict())
         project, p, kind, sample_id = self.check_instance(*args, **kwargs)
-        q = {"sample_id": sample_id}
+        q = {}
+        if sample_id:
+            q.update({"sample_id": sample_id})
         if kind:
             q.update({"kind": kind})
         data_list = p.datasets.filter(**q).order_by('end_time') \
@@ -650,7 +659,9 @@ class ProposalDataSets(VerificationMixin, View):
         data_id = info.get('id')
         kwargs.update(request.GET.dict())
         project, p, kind, sample_id = self.check_instance(*args, **kwargs)
-        q = {"sample_id": sample_id, "id": data_id}
+        q = {"id": data_id}
+        if sample_id:
+            q.update({"sample_id": sample_id})
         if kind:
             q.update({"kind": kind})
         if data_id:
