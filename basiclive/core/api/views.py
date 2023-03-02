@@ -556,7 +556,8 @@ class ProposalSamples(VerificationMixin, View):
             raise http.Http404("Proposal does not exist.")
 
         if sample_name:
-            sample_list = p.samples.filter(collect_status=True, group__name__contains=sample_name).order_by('group__priority', 'priority').values(
+            sample_list = p.samples.filter(collect_status=True, group__name__contains=sample_name).order_by(
+                'group__priority', 'priority').values(
                 'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
 
             )
@@ -666,22 +667,24 @@ class ProposalDataSets(VerificationMixin, View):
             q.update({"kind": kind})
         if data_id:
             data = p.datasets.filter(**q).values('beamline__name',
-                                                        'group__name',
-                                                        'sample__name',
-                                                        'session__name', 'id',
-                                                        'name', 'frames',
-                                                        'kind__acronym',
-                                                        'file_name',
-                                                        'energy',
-                                                        'end_time',
-                                                        'start_time',
-                                                        'num_frames')
+                                                 'group__name',
+                                                 'sample__name',
+                                                 'session__name', 'id',
+                                                 'name', 'frames',
+                                                 'kind__acronym',
+                                                 'file_name',
+                                                 'energy',
+                                                 'end_time',
+                                                 'start_time',
+                                                 'num_frames')
             if len(data):
                 return JsonResponse(prep_data(data[0]), safe=False)
         raise http.Http404("No data found matching that id.")
 
+
 REPORTKEYS = {
     'id': 'id',
+    'files': 'files',
     'proposal__name': 'proposal',
     'data__name': 'dataset',
     'details': 'report'
@@ -695,6 +698,7 @@ def prep_report(info, **kwargs):
     }
     report.update(**kwargs)
     return report
+
 
 class ProposalReports(VerificationMixin, View):
     """
@@ -740,6 +744,7 @@ class ProposalReports(VerificationMixin, View):
                     'status')
         report = [prep_report(report, order=i) for i, report in enumerate(report_list)]
         return JsonResponse(report, safe=False)
+
 
 class ProposalList(VerificationMixin, View):
 
