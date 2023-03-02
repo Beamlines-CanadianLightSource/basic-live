@@ -681,6 +681,7 @@ class ProposalDataSets(VerificationMixin, View):
         raise http.Http404("No data found matching that id.")
 
 REPORTKEYS = {
+    'id': 'id',
     'proposal__name': 'proposal',
     'data__name': 'dataset',
     'details': 'report'
@@ -735,6 +736,7 @@ class ProposalReports(VerificationMixin, View):
                     'name', 'url',
                     'details',
                     'modified',
+                    'files',
                     'status')
         report = [prep_report(report, order=i) for i, report in enumerate(report_list)]
         return JsonResponse(report, safe=False)

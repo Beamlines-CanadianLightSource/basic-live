@@ -1475,6 +1475,7 @@ class AnalysisReport(ActiveStatusMixin):
     data = models.ManyToManyField(Data, blank=True, related_name="reports")
     url = models.CharField(max_length=200)
     details = models.JSONField(default=list)
+    files = models.JSONField(default=dict)
 
     objects = ProjectObjectManager()
 
