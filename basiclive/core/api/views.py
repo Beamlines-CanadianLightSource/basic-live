@@ -535,7 +535,7 @@ class ProposalSamples(VerificationMixin, View):
     """
     :Return: Dictionary for each sample owned by the proposal.
 
-    :key: r'^(?P<signature>(?P<username>):.+)/proposal/samples/(?<proposal>)/$'
+    :key: r'^(?P<signature>(?P<username>):.+)/proposal-sample/(?<proposal>)/$'
     """
 
     def get(self, request, *args, **kwargs):
@@ -599,7 +599,7 @@ class ProposalDataSets(VerificationMixin, View):
     """
     :Return: Dictionary for each dataset owned by the proposal, or one matching a posted primary_key.
 
-    :key: r'^(?P<signature>(?P<username>):.+)/proposal/data/(?P<proposal>[\w_-]+)/$'
+    :key: r'^(?P<signature>(?P<username>):.+)/proposal-data/(?P<proposal>[\w_-]+)/$'
     """
 
     def check_instance(self, *args, **kwargs):
@@ -680,6 +680,64 @@ class ProposalDataSets(VerificationMixin, View):
                 return JsonResponse(prep_data(data[0]), safe=False)
         raise http.Http404("No data found matching that id.")
 
+REPORTKEYS = {
+    'proposal__name': 'proposal',
+    'data__name': 'dataset',
+    'details': 'report'
+}
+
+
+def prep_report(info, **kwargs):
+    report = {
+        REPORTKEYS.get(key): value
+        for key, value in info.items()
+    }
+    report.update(**kwargs)
+    return report
+
+class ProposalReports(VerificationMixin, View):
+    """
+    :Return: Dictionary for each sample owned by the proposal.
+
+    :key: r'^(?P<signature>(?P<username>):.+)/proposal-report/(?<proposal>)/$'
+    """
+
+    def get(self, request, *args, **kwargs):
+        data_id = request.GET.get('data', None)
+        kind = request.GET.get('kind', None)
+        project_name = kwargs.get('username')
+        proposal = kwargs.get('proposal')
+        try:
+            project = Project.objects.get(username__exact=project_name)
+        except Project.DoesNotExist:
+            raise http.Http404("Project does not exist.")
+
+        try:
+            proposal = proposal.replace("prj", "")
+            p = Proposal.objects.get(name__iexact=proposal)
+            if not p.is_team_member(project):
+                return http.HttpResponseForbidden()
+        except Proposal.DoesNotExist:
+            raise http.Http404("Proposal does not exist.")
+
+        q = {}
+        if data_id:
+            q.update({'data__id': data_id})
+        if kind:
+            q.update({'kind': kind})
+
+        report_list = p.reports.filter(**q).order_by('modified') \
+            .values('id',
+                    'proposal__name',
+                    'data__name',
+                    'kind',
+                    'score',
+                    'name', 'url',
+                    'details',
+                    'modified',
+                    'status')
+        report = [prep_report(report, order=i) for i, report in enumerate(report_list)]
+        return JsonResponse(report, safe=False)
 
 class ProposalList(VerificationMixin, View):
 
