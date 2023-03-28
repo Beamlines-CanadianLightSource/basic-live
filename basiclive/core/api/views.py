@@ -394,7 +394,8 @@ class AddReport(VerificationMixin, View):
                 'kind': info.get('kind', 'Data Analysis'),
                 'details': info.get('details'),
                 'name': info.get('title'),
-                'url': key,
+                'files': info.get('files'),
+                'url': info.get('directory'),
                 'proposal': proposal
             }
         else:
