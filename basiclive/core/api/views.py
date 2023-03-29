@@ -609,6 +609,7 @@ class ProposalDataSets(VerificationMixin, View):
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
         sample_id = kwargs.get('sample')
+        data_id = kwargs.get('data')
         acro = kwargs.get('kind', None)
 
         try:
@@ -632,16 +633,19 @@ class ProposalDataSets(VerificationMixin, View):
         else:
             kind = None
 
-        return project, p, kind, sample_id
+        return project, p, kind, sample_id, data_id
 
     def get(self, request, *args, **kwargs):
         kwargs.update(request.GET.dict())
-        project, p, kind, sample_id = self.check_instance(*args, **kwargs)
+        project, p, kind, sample_id, data_id = self.check_instance(*args, **kwargs)
         q = {}
         if sample_id:
             q.update({"sample_id": sample_id})
         if kind:
             q.update({"kind": kind})
+        if data_id:
+            q.update({"id": data_id})
+
         data_list = p.datasets.filter(**q).order_by('end_time') \
             .values('beamline__name',
                     'group__name',
