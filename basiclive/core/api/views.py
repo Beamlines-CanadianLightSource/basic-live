@@ -378,11 +378,6 @@ class AddReport(VerificationMixin, View):
         except:
             raise http.Http404("Data does not exist")
 
-        # Download key
-        try:
-            key = make_secure_path(info.get('directory'))
-        except ValueError:
-            return http.HttpResponseServerError("Unable to create SecurePath")
         if LIMS_USE_PROPOSAL:
             try:
                 proposal = Proposal.objects.get(name__exact=info.get('proposal'))
@@ -399,6 +394,12 @@ class AddReport(VerificationMixin, View):
                 'proposal': proposal
             }
         else:
+            # Download key
+            try:
+                key = make_secure_path(info.get('directory'))
+            except ValueError:
+                return http.HttpResponseServerError("Unable to create SecurePath")
+
             details = {
                 'project': project,
                 'score': info.get('score') if info.get('score') else 0,
