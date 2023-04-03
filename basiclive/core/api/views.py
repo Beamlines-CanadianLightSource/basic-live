@@ -697,7 +697,12 @@ REPORTKEYS = {
     'files': 'files',
     'proposal__name': 'proposal',
     'data__name': 'dataset',
-    'details': 'report'
+    'details': 'report',
+    'url': 'url',
+    'name': 'name',
+    'score':'score',
+    'modified': 'modified',
+    'status': 'status'
 }
 
 
