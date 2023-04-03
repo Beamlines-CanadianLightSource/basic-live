@@ -31,12 +31,16 @@ PROXY_URL = getattr(settings, 'DOWNLOAD_PROXY_URL', '')
 MAX_CONTAINER_DEPTH = getattr(settings, 'MAX_CONTAINER_DEPTH', 2)
 LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 LIMS_USE_CRM = getattr(settings, 'LIMS_USE_CRM', False)
+CERT_KEY = getattr(settings, 'DOWNLOAD_PROXY_CERT', False)
 
 
 def make_secure_path(path):
     # Download  key
     url = PROXY_URL + '/data/create/'
-    r = requests.post(url, data={'path': path})
+    if CERT_KEY:
+        r = requests.post(url, data={'path': path}, verify=CERT_KEY)
+    else:
+        r = requests.post(url, data={'path': path})
     if r.status_code == 200:
         key = r.json()['key']
         return key
