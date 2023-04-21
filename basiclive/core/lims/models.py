@@ -349,6 +349,8 @@ class Session(models.Model):
         ordering = ('-created',)
 
     def __str__(self):
+        if LIMS_USE_PROPOSAL:
+            return '{}-{}'.format(self.proposal.name.upper(), self.name)
         return '{}-{}'.format(self.project.name.upper(), self.name)
 
     def identity(self):
@@ -376,6 +378,8 @@ class Session(models.Model):
         return Group.objects.filter(samples__datasets__session=self, project=self.project).distinct()
 
     def reports(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.reports.filter(data__session=self).distinct()
         return self.project.reports.filter(data__session=self).distinct()
 
     def orphans(self):
@@ -398,6 +402,8 @@ class Session(models.Model):
     num_reports.short_description = _("Reports")
 
     def samples(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.samples.filter(datasets__session=self).distinct()
         return self.project.samples.filter(datasets__session=self).distinct()
 
     @memoize(60)
@@ -648,12 +654,16 @@ class Shipment(TransitStatusMixin):
         return self.containers.aggregate(sample_count=Count('samples'))['sample_count']
 
     def datasets(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.datasets.filter(sample__container__shipment__pk=self.pk)
         return self.project.datasets.filter(sample__container__shipment__pk=self.pk)
 
     def num_datasets(self):
         return self.datasets().count()
 
     def reports(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.reports.filter(data__sample__container__shipment__pk=self.pk)
         return self.project.reports.filter(data__sample__container__shipment__pk=self.pk)
 
     def num_reports(self):
@@ -684,6 +694,10 @@ class Shipment(TransitStatusMixin):
         return True
 
     def is_processing(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.samples.filter(container__shipment__exact=self).filter(
+            Q(pk__in=self.project.datasets.values('sample')) |
+            Q(pk__in=self.project.result_set.values('sample'))).exists()
         return self.project.samples.filter(container__shipment__exact=self).filter(
             Q(pk__in=self.project.datasets.values('sample')) |
             Q(pk__in=self.project.result_set.values('sample'))).exists()
@@ -716,9 +730,13 @@ class Shipment(TransitStatusMixin):
         return self.groups.order_by('-priority')
 
     def requests(self):
+        if LIMS_USE_PROPOSAL:
+            return  self.proposal.requests.filter(Q(groups__shipment=self) | Q(samples__group__shipment=self)).distinct()
         return self.project.requests.filter(Q(groups__shipment=self) | Q(samples__group__shipment=self)).distinct()
 
     def sample_requests(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.requests.filter(samples__group__shipment=self)
         return self.project.requests.filter(samples__group__shipment=self)
 
     def receive(self, request=None):
@@ -872,6 +890,8 @@ class Container(TransitStatusMixin):
         ordering = ('kind', 'location', 'name')
 
     def __str__(self):
+        if LIMS_USE_PROPOSAL:
+            return "{} | {} | {}".format(self.kind.name.title(), self.proposal.name.upper(), self.name)
         return "{} | {} | {}".format(self.kind.name.title(), self.project.name.upper(), self.name)
 
     def identity(self):
@@ -1239,6 +1259,8 @@ class Group(ProjectObjectMixin):
         return self.samples.count()
 
     def all_requests(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.requests.filter(Q(groups=self) | Q(samples__group=self)).distinct()
         return self.project.requests.filter(Q(groups=self) | Q(samples__group=self)).distinct()
 
     def complete(self):
@@ -1306,6 +1328,8 @@ class Sample(ProjectObjectMixin):
         return self.container.automounter()
 
     def reports(self):
+        if LIMS_USE_PROPOSAL:
+            return AnalysisReport.objects.filter(proposal=self.proposal, data__sample=self)
         return AnalysisReport.objects.filter(project=self.project, data__sample=self)
 
     def all_requests(self):
@@ -1506,6 +1530,8 @@ class AnalysisReport(ActiveStatusMixin):
         return reverse('report-detail', kwargs={'pk': self.id})
 
     def sessions(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.sessions.filter(pk__in=self.data.values_list('session__pk', flat=True)).distinct()
         return self.project.sessions.filter(pk__in=self.data.values_list('session__pk', flat=True)).distinct()
 
 

@@ -1174,12 +1174,14 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
     def get_form_initial(self, step):
         project = self.request.user
         if step == 'start':
-            samples = project.samples.filter(pk__in=self.request.GET.getlist('samples'))
-            groups = project.sample_groups.filter(pk__in=self.request.GET.getlist('groups'))
+            samples = models.Sample.objects.filter(pk__in=self.request.GET.getlist('samples'))
+            groups = models.Group.objects.filter(pk__in=self.request.GET.getlist('groups'))
             if groups:
                 proposal = groups.first().proposal
             else:
                 proposal = self.request.GET.get('proposal')
+            if project.is_superuser:
+                project = proposal.team_members.first()
             return self.initial_dict.get(step, {
                 'project': project,
                 'proposal': proposal,
@@ -1228,9 +1230,15 @@ class RequestWizardEdit(UserPassesTestMixin, SessionWizardView):
                  ('parameters', forms.RequestParameterForm)]
     template_name = "lims/forms/add-request.html"
 
+    def get_object(self):
+        return models.Request.objects.get(**self.kwargs)
+
     def test_func(self):
+        if LIMS_USE_PROPOSAL:
+            return self.request.user.is_superuser or getattr(self.get_object(), 'proposal').is_team_member(
+                self.request.user)
         try:
-            return models.Request.objects.get(**self.kwargs).project.username == self.request.user.username
+            return self.get_object().project.username == self.request.user.username
         except models.Request.DoesNotExist:
             return False
 
