@@ -15,7 +15,7 @@
         <span class="text-thin">Container |</span>
         <span class="text-condensed">
             {% if use_proposal %}
-            <span class="text-muted">{% if user.is_superuser %}{{ object.proposal.name }} | {% endif %}</span><strong>{{ object.name }}</strong>
+            <span class="text-muted">{{ object.proposal.name }} | </span><strong>{{ object.name }}</strong>
             {% else %}
             <span class="text-muted">{% if user.is_superuser %}{{ object.project }} | {% endif %}</span><strong>{{ object.name }}</strong>
             {% endif %}
