@@ -8,7 +8,11 @@
     <h3>
         <span class="text-thin">Group |</span>
         <span class="text-condensed">
+            {% if use_proposal %}
+            <span class="text-muted">{% if user.is_superuser %}{{ object.proposal.name }} | {% endif %}</span><strong>{{ object.name }}</strong>
+            {% else %}
             <span class="text-muted">{% if user.is_superuser %}{{ object.project }} | {% endif %}</span><strong>{{ object.name }}</strong>
+            {% endif %}
         </span>
     </h3>
     <span class="text-muted">

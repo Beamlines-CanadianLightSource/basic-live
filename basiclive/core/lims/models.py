@@ -932,7 +932,10 @@ class Container(TransitStatusMixin):
         groups = set([])
         for sample in self.samples.all():
             for group in sample.groups.all():
-                groups.add('%s-%s' % (group.project.name, group.name))
+                if LIMS_USE_PROPOSAL:
+                    groups.add('%s-%s' % (group.proposal.name, group.name))
+                else:
+                    groups.add('%s-%s' % (group.project.name, group.name))
         return ', '.join(groups)
 
     def get_group_list(self):
@@ -991,6 +994,7 @@ class Container(TransitStatusMixin):
             'name': self.name,
             'parent': None if not self.parent else self.parent.pk,
             'owner': self.project.name.upper(),
+            'proposal': self.proposal.name.upper(),
             'height': self.kind.height,
             'url': self.get_absolute_url(),
             'loc': self.get_location_name(),
@@ -1524,7 +1528,7 @@ class AnalysisReport(ActiveStatusMixin):
                 return 'SCR'
             else:
                 return 'NAT'
-        return self.kind[:3].upper()
+        return self.kind.upper().split()[0]
 
     def get_absolute_url(self):
         return reverse('report-detail', kwargs={'pk': self.id})

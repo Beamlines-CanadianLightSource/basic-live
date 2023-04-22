@@ -5,7 +5,11 @@
 {% block page_heading %}
     <h3 class="text-condensed">
         <i class="text-muted fa fa-fw {% if object.is_editable %}fa-unlock{% else %}fa-lock{% endif %}"></i>
-        <span class="text-muted">{% if user.is_superuser %}{{ object.project|upper }} | {% endif %}</span><strong>{{ object.name }}</strong>
+        {% if use_proposal %}
+        <span class="text-muted">{% if user.is_superuser %}{{ object.proposal.name }} | {% endif %}</span><strong>{{ object.name }}</strong>
+        {% else %}
+        <span class="text-muted">{% if user.is_superuser %}{{ object.project }} | {% endif %}</span><strong>{{ object.name }}</strong>
+        {% endif %}
     </h3>
     <span class="text-muted">
         {% if object.container.shipment %}

@@ -43,7 +43,10 @@ class AsyncFormMixin(object):
         if 'ASGIRequest' in str(type(self.request)):
             ajax = True
         else:
-            ajax = self.request.is_ajax()
+            try:
+                ajax = self.request.is_ajax()
+            except AttributeError:
+                ajax = True
 
         if ajax:
             data = {
