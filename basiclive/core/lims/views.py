@@ -759,7 +759,7 @@ class ContainerList(ListViewMixin, ItemListView):
 class ContainerDetail(DetailListMixin, SampleList):
     extra_model = models.Container
     template_name = "lims/entries/container.html"
-    list_columns = ['name', 'barcode', 'group', 'location', 'comments']
+    list_columns = ['name', 'barcode', 'group', 'location', 'comments', 'requested']
     link_url = 'sample-detail'
     show_project = False
 
@@ -1179,9 +1179,7 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
             if groups:
                 proposal = groups.first().proposal
             else:
-                proposal = self.request.GET.get('proposal')
-            if project.is_superuser:
-                project = proposal.team_members.first()
+                proposal = models.Proposal.objects.filter(name=self.request.GET.get('proposal')).first()
             return self.initial_dict.get(step, {
                 'project': project,
                 'proposal': proposal,
@@ -1198,8 +1196,8 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
                     'request': start_data.get('start-request'),
                     'comments': start_data.get('start-comments'),
                     'name': start_data.get('start-name'),
-                    'samples': project.samples.filter(pk__in=start_data.getlist('start-samples')),
-                    'groups': project.sample_groups.filter(pk__in=start_data.getlist('start-groups')),
+                    'samples': models.Sample.objects.filter(pk__in=start_data.getlist('start-samples')),
+                    'groups': models.Group.objects.filter(pk__in=start_data.getlist('start-groups')),
                 })
         return self.initial_dict.get(step, {})
 

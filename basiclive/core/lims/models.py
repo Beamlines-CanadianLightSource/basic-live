@@ -1336,6 +1336,10 @@ class Sample(ProjectObjectMixin):
             return AnalysisReport.objects.filter(proposal=self.proposal, data__sample=self)
         return AnalysisReport.objects.filter(project=self.project, data__sample=self)
 
+    def requested(self):
+        requests = list(self.requests.all()) + list(self.group.requests.all())
+        return ",".join([f"{r.name}" for r in requests])
+
     def all_requests(self):
         return list(self.requests.all()) + list(self.group.requests.all())
 

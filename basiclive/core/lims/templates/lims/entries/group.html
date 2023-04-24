@@ -39,9 +39,15 @@
             {% endif %}
             </a>
         {% endif %}
+        {% if use_proposal %}
+        <a href="#!" data-form-link="{% url 'request-new' %}?groups={{ object.pk }}&proposal={{ object.proposal.name }}" title="Add a Request">
+            {% show_icon label='Request' icon="ti ti-md ti-ruler-pencil" badge="+" color="primary" %}
+        </a>
+        {% else %}
         <a href="#!" data-form-link="{% url 'request-new' %}?groups={{ object.pk }}" title="Add a Request">
             {% show_icon label='Request' icon="ti ti-md ti-ruler-pencil" badge="+" color="primary" %}
         </a>
+        {% endif %}
         <div class="separator"></div>
     {% endif %}
     {% include "lims/tools-base.html" %}

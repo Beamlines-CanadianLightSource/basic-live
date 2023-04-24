@@ -195,7 +195,7 @@ class UpdateLocations(AdminRequiredMixin, View):
 
 class FetchContainerLayout(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
-        if request.user.is_superuser:
+        if request.user.is_superuser or LIMS_USE_PROPOSAL:
             qs = models.Container.objects.filter()
         else:
             qs = models.Container.objects.filter(project=self.request.user)
