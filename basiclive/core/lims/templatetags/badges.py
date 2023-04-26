@@ -1,5 +1,7 @@
 from django import template
 from basiclive.utils import colors
+from django.conf import settings
+ENERGY_UNITS = getattr(settings, 'ENERGY_UNITS', 'eV')
 
 register = template.Library()
 
@@ -9,7 +11,7 @@ def dataset(data):
     if data.kind.acronym in ['RASTER', 'SCREEN', 'XRD', 'DATA']:
         return "{} imgs".format(len(data.frames))
     else:
-        return "{} keV".format(data.energy)
+        return f"{data.energy:.3f} {ENERGY_UNITS}"
 
 
 @register.filter("report_summary")

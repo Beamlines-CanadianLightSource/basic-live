@@ -1031,7 +1031,7 @@ def format_score(val, record):
 class ReportList(ListViewMixin, ItemListView):
     model = models.AnalysisReport
     list_filters = ['modified', 'kind']
-    list_columns = ['id', 'name', 'kind', 'score', 'modified']
+    list_columns = ['id', 'name', 'energy', 'kind', 'score', 'modified']
     if LIMS_USE_PROPOSAL:
         list_filters = ['proposal__name', 'modified', 'kind']
         list_search = ['proposal__name', 'name', 'data__name']

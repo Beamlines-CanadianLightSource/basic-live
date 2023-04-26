@@ -30,6 +30,7 @@ RESTRICT_DOWNLOADS = getattr(settings, 'RESTRICT_DOWNLOADS', False)
 SHIFT_HRS = getattr(settings, 'HOURS_PER_SHIFT', 8)
 SHIFT_SECONDS = SHIFT_HRS * 3600
 LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
+ENERGY_UNITS = getattr(settings, 'ENERGY_UNITS', 'eV')
 
 
 MAX_CONTAINER_DEPTH = getattr(settings, 'MAX_CONTAINER_DEPTH', 2)
@@ -1542,6 +1543,8 @@ class AnalysisReport(ActiveStatusMixin):
             return self.proposal.sessions.filter(pk__in=self.data.values_list('session__pk', flat=True)).distinct()
         return self.project.sessions.filter(pk__in=self.data.values_list('session__pk', flat=True)).distinct()
 
+    def energy(self):
+        return " | ".join([f"{en:.2f} {ENERGY_UNITS}" for en in self.data.values_list('energy', flat=True)])
 
 class ActivityLogManager(models.Manager):
     def log_activity(self, request, obj, action_type, description=''):
