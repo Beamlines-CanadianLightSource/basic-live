@@ -16,7 +16,7 @@ def dataset(data):
 
 @register.filter("report_summary")
 def report_summary(report):
-    return "{:0.2f}".format(report.score)
+    return f"{report.score:0.2f} | {report.energy()}"
 
 
 @register.inclusion_tag('lims/components/badge-score.html')
