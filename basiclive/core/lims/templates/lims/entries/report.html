@@ -6,6 +6,7 @@
 {% load icons %}
 {% load jsutils %}
 
+
 {% block extra_css %}
     <link href="{% static "misc/css/c3.min.css" %}" rel="stylesheet">
     <link href="{% static "lims/css/reports.min.css" %}" rel="stylesheet">
@@ -44,7 +45,6 @@
                 {% endif %}
             </div>
             <div class="col">
-                {% get_setting 'ENERGY_UNITS' as nrg %}
                 <small class="text-muted text-condensed">Energy ({{ nrg }}):</small><br>
                 {% for data in object.data.all %}<a data-link="{% url 'data-detail' data.pk %}">{{ data.energy|floatformat:2 }}</a>{% if not forloop.last %}<span class="text-muted"> | </span>{% endif %}{% endfor %}
             </div>
