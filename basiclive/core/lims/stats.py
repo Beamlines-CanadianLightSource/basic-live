@@ -301,7 +301,7 @@ def usage_summary(period='year', **all_filters):
             'data': data
         }
 
-    beamtime = {}
+    beamtime = []
     if settings.LIMS_USE_SCHEDULE:
         from basiclive.core.schedule.stats import beamtime_summary
 
