@@ -1,4 +1,7 @@
 {% load icons %}
+{% load settings %}
+{% load truncate_filters %}
+{% get_setting 'LIMS_USE_PROPOSAL' as use_proposal %}
 
 {% if detailed %}
     {% if bt.notification %}
@@ -27,7 +30,9 @@
     </div>
 {% endif %}
 
-{% if bt.project.alias %}
+{% if use_proposal %}
+    {{ bt.proposal.name }} {% if detailed %}| <strong>{{ bt.proposal.members|truncate_csv:2 }}</strong> {% endif %}
+{% elif bt.project.alias %}
     {{ bt.project.alias }} {% if detailed %}(<strong>{{ bt.project }}</strong>){% endif %}
 {% else %}
     {{ bt.project|default_if_none:"Reserved" }}

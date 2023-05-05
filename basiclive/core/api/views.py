@@ -60,7 +60,6 @@ class VerificationMixin(object):
     """
 
     def dispatch(self, request, *args, **kwargs):
-        print(kwargs)
         if not (kwargs.get('username') and kwargs.get('signature')):
             return http.HttpResponseForbidden()
         else:
@@ -284,7 +283,8 @@ KEYS = {
     'barcode': 'barcode',
     'comments': 'comments',
     'location__name': 'location',
-    'port_name': 'port'
+    'port_name': 'port',
+    'container__id': 'container_id'
 }
 
 
@@ -332,7 +332,7 @@ class ProjectSamples(VerificationMixin, View):
                 return http.HttpResponseForbidden()
             sample_list = proposal.samples.filter(query).order_by('group__priority', 'priority').values(
                 'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
-                'location__name', 'container__location__name', 'port_name'
+                'location__name', 'container__location__name', 'port_name', 'container__id'
             )
         else:
             sample_list = project.samples.filter(query).order_by('group__priority', 'priority').values(
@@ -546,8 +546,18 @@ class ProposalSamples(VerificationMixin, View):
 
     def get(self, request, *args, **kwargs):
         sample_name = request.GET.get('name', None)
+        collect = request.GET.get('collect', True)
+        container_id = request.GET.get('container_id', None)
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
+
+        print(collect)
+
+        if not isinstance(collect, bool):
+            if collect.lower() == 'false':
+                collect = False
+            else:
+                collect = True
         try:
             project = Project.objects.get(username__exact=project_name)
         except Project.DoesNotExist:
@@ -562,15 +572,23 @@ class ProposalSamples(VerificationMixin, View):
             raise http.Http404("Proposal does not exist.")
 
         if sample_name:
-            sample_list = p.samples.filter(collect_status=True, group__name__contains=sample_name).order_by(
-                'group__priority', 'priority').values(
-                'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+            if container_id:
+                sample_list = p.samples.filter(collect_status=collect, name__contains=sample_name, container__id=container_id).order_by(
+                    'group__priority', 'priority').values(
+                    'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+                    'container__id'
+                )
+            else:
+                sample_list = p.samples.filter(collect_status=collect, name__contains=sample_name).order_by(
+                    'group__priority', 'priority').values(
+                    'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
+                    'container__id'
 
-            )
+                )
         else:
-            sample_list = p.samples.filter(collect_status=True).order_by('group__priority', 'priority').values(
+            sample_list = p.samples.filter(collect_status=collect).order_by('group__priority', 'priority').values(
                 'container__name', 'container__kind__name', 'group__name', 'id', 'name', 'barcode', 'comments',
-
+                'container__id'
             )
         samples = [prep_sample(sample, index=i) for i, sample in enumerate(sample_list)]
         return JsonResponse(samples, safe=False)

@@ -29,7 +29,7 @@ IDENTITY_FORMAT = '-%y%m'
 RESTRICT_DOWNLOADS = getattr(settings, 'RESTRICT_DOWNLOADS', False)
 SHIFT_HRS = getattr(settings, 'HOURS_PER_SHIFT', 8)
 SHIFT_SECONDS = SHIFT_HRS * 3600
-LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', True)
 ENERGY_UNITS = getattr(settings, 'ENERGY_UNITS', 'eV')
 
 
@@ -885,14 +885,26 @@ class Container(TransitStatusMixin):
     objects = ContainerManager()
 
     class Meta:
-        unique_together = (
-            ("project", "name", "shipment"),
-        )
+        if LIMS_USE_PROPOSAL:
+            unique_together = (
+                ("proposal", "name", "shipment"),
+            )
+        else:
+            unique_together = (
+                ("project", "name", "shipment"),
+            )
         ordering = ('kind', 'location', 'name')
 
     def __str__(self):
         if LIMS_USE_PROPOSAL:
-            return "{} | {} | {}".format(self.kind.name.title(), self.proposal.name.upper(), self.name)
+            kind = self.kind.name.title()
+            prop = self.proposal
+            name = self.name
+            if prop:
+                return "{} | {} | {}".format(kind, prop.name.upper(), name)
+            else:
+                return "{} | {} ".format(kind, name)
+
         return "{} | {} | {}".format(self.kind.name.title(), self.project.name.upper(), self.name)
 
     def identity(self):
@@ -1071,6 +1083,15 @@ class Automounter(models.Model):
     staff_comments = models.TextField(blank=True, null=True)
     modified = models.DateTimeField('date modified', auto_now=True, editable=False)
     active = models.BooleanField(default=False)
+
+    def proposal(self):
+        return self.container.proposal
+
+    def name(self):
+        return self.__str__()
+
+    def project(self):
+        return self.container.project
 
     def __str__(self):
         return "{} | {}".format(self.beamline.acronym, self.container.name)

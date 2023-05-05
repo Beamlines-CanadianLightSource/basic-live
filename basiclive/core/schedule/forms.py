@@ -8,6 +8,9 @@ from crispy_forms.layout import Div, Field, Layout, HTML
 from basiclive.core.lims.models import Project
 from basiclive.core.lims.forms import BodyHelper, FooterHelper
 from .models import Beamtime, BeamlineSupport, Downtime, EmailNotification
+from django.conf import settings
+
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', True)
 
 
 class BeamtimeForm(forms.ModelForm):
@@ -16,7 +19,10 @@ class BeamtimeForm(forms.ModelForm):
 
     class Meta:
         model = Beamtime
-        fields = ['project', 'beamline', 'start', 'end', 'comments', 'access', 'notify']
+        if LIMS_USE_PROPOSAL:
+            fields = ['proposal', 'beamline', 'start', 'end', 'comments', 'access', 'notify']
+        else:
+            fields = ['project', 'beamline', 'start', 'end', 'comments', 'access', 'notify']
         widgets = {
             'comments': forms.Textarea(attrs={"cols": 40, "rows": 7}),
             'beamline': forms.HiddenInput(),
@@ -43,28 +49,52 @@ class BeamtimeForm(forms.ModelForm):
         else:
             self.body.title = u"New Beamtime"
             self.body.form_action = reverse_lazy('new-beamtime')
-        self.body.layout = Layout(
-            errors,
-            Div(
-                Div('project', css_class="col-12"),
-                Div('beamline', css_class="col-12"),
-                css_class="row"
-            ),
-            Div(
-                Div(Field('start'), css_class="col-6"),
-                Div(Field('end'), css_class="col-6"),
-                css_class="row"
-            ),
-            Div(
-                Div(Field('access', css_class="select"), css_class="col-6"),
-                Div(Field('notify'), css_class="col-6 px-4 pt-4"),
-                css_class="row"
-            ),
-            Div(
-                Div('comments', css_class="col-12"),
-                css_class="row"
-            ),
-        )
+        if LIMS_USE_PROPOSAL:
+            self.body.layout = Layout(
+                errors,
+                Div(
+                    Div('proposal', css_class="col-12"),
+                    Div('beamline', css_class="col-12"),
+                    css_class="row"
+                ),
+                Div(
+                    Div(Field('start'), css_class="col-6"),
+                    Div(Field('end'), css_class="col-6"),
+                    css_class="row"
+                ),
+                Div(
+                    Div(Field('access', css_class="select"), css_class="col-6"),
+                    Div(Field('notify'), css_class="col-6 px-4 pt-4"),
+                    css_class="row"
+                ),
+                Div(
+                    Div('comments', css_class="col-12"),
+                    css_class="row"
+                ),
+            )
+        else:
+            self.body.layout = Layout(
+                errors,
+                Div(
+                    Div('project', css_class="col-12"),
+                    Div('beamline', css_class="col-12"),
+                    css_class="row"
+                ),
+                Div(
+                    Div(Field('start'), css_class="col-6"),
+                    Div(Field('end'), css_class="col-6"),
+                    css_class="row"
+                ),
+                Div(
+                    Div(Field('access', css_class="select"), css_class="col-6"),
+                    Div(Field('notify'), css_class="col-6 px-4 pt-4"),
+                    css_class="row"
+                ),
+                Div(
+                    Div('comments', css_class="col-12"),
+                    css_class="row"
+                ),
+            )
         self.footer.layout = Layout(
             StrictButton('Revert', type='reset', value='Reset', css_class="btn btn-secondary"),
             StrictButton('Save', type='submit', name="submit", value='save', css_class='btn btn-primary'),

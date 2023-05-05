@@ -11,13 +11,14 @@ from basiclive.utils.functions import Shifts, ShiftEnd, ShiftStart
 from colorfield.fields import ColorField
 from datetime import datetime, timedelta
 
-from basiclive.core.lims.models import Project, Beamline, Stretch
+from basiclive.core.lims.models import Project, Beamline, Stretch, Proposal
 
 from geopy import geocoders
 import timezonefinder, pytz
 
 tf = timezonefinder.TimezoneFinder()
 
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', True)
 MIN_SUPPORT_HOUR = getattr(settings, 'MIN_SUPPORT_HOUR', 0)
 MAX_SUPPORT_HOUR = getattr(settings, 'MAX_SUPPORT_HOUR', 24)
 APP_NAME = getattr(settings, 'APP_NAME', 'basiclive')
@@ -72,6 +73,7 @@ class BeamtimeManager(models.Manager.from_queryset(BeamtimeQuerySet)):
 
 class Beamtime(models.Model):
     project = models.ForeignKey(Project, related_name="beamtime", on_delete=models.CASCADE, null=True, blank=True)
+    proposal = models.ForeignKey(Proposal, related_name='beamtime', on_delete=models.CASCADE, null=True, blank=True)
     beamline = models.ForeignKey(Beamline, related_name="beamtime", on_delete=models.CASCADE)
     comments = models.TextField(blank=True)
     access = models.ForeignKey(AccessType, related_name="beamtime", on_delete=models.SET_NULL, null=True)
@@ -106,7 +108,7 @@ class Beamtime(models.Model):
         return BeamlineSupport.objects.filter(date=dt).first()
 
     def display(self, detailed=False):
-        return render_to_string('schedule/templates/schedule/beamtime.html', {'bt': self, 'detailed': detailed})
+        return render_to_string('schedule/beamtime.html', {'bt': self, 'detailed': detailed})
 
     def notification(self):
         return self.notifications.first()
@@ -117,7 +119,11 @@ class Beamtime(models.Model):
 
     def name(self):
         name = 'User'
-        if self.project:
+        if LIMS_USE_PROPOSAL:
+            name = 'Proposal'
+            if self.proposal:
+                name = self.proposal.name
+        elif self.project:
             name = self.project.contact_person or '{person.first_name} {person.last_name}'.format(person=self.project)
         return name
 
