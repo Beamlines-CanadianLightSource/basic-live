@@ -463,6 +463,7 @@ class AddData(VerificationMixin, View):
         except Project.DoesNotExist:
             raise http.Http404("Project does not exist.")
 
+
         try:
             beamline = Beamline.objects.get(acronym=beamline_name)
         except:
@@ -486,6 +487,7 @@ class AddData(VerificationMixin, View):
                 proposal = Proposal.objects.get(name__exact=info.get('proposal'))
             except:
                 raise http.Http404("Proposal does not exist")
+            sample = proposal.samples.filter(pk=info.get('sample_id')).first()
             details = {
                 'session': (session and session.proposal == proposal) and session or None,
                 'project': project,
