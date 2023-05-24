@@ -23,14 +23,14 @@
 {% endblock %}
 
 {% block object_tools %}
-    {%  if object.container.status == object.container.STATES.DRAFT %}
+    {%  if object.container.status == object.container.STATES.DRAFT or user.is_superuser %}
         <a href="#!" data-form-link="{% url 'request-new' %}?samples={{ object.pk }}" title="Add a Request">
             {% show_icon label='Request' icon="ti ti-md ti-ruler-pencil" badge="+" color="primary" %}
         </a>
         <div class="separator"></div>
     {% endif %}
     {% if object.container.status == object.container.STATES.DRAFT or object.comments or object.staff_comments %}
-    {% if object.container.status == object.container.STATES.DRAFT %}
+    {% if object.container.status == object.container.STATES.DRAFT or user.is_superuser%}
         <a href="#!" data-form-link="{{ handler }}edit/">
             {% show_icon label='Edit' icon='ti ti-md ti-pencil-alt' %}
         </a>
