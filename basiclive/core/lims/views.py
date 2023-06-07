@@ -1595,6 +1595,8 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
     def post(self, request, *args, **kwargs):
         if request.user.is_superuser:
             qs = models.Container.objects.filter()
+        elif LIMS_USE_PROPOSAL:
+            qs = models.Container.objects.filter(proposal__in=self.request.user.proposals)
         else:
             qs = models.Container.objects.filter(project=self.request.user)
         try:
@@ -1607,10 +1609,16 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
             }
             group_map = {}
             for name in groups:
-                group, created = models.Group.objects.get_or_create(
-                    project=container.project, shipment=container.shipment,
-                    name=name,
-                )
+                if LIMS_USE_PROPOSAL:
+                    group, created = models.Group.objects.get_or_create(
+                        shipment=container.shipment,
+                        name=name, proposal=container.proposal
+                    )
+                else:
+                    group, created = models.Group.objects.get_or_create(
+                        project=container.project, shipment=container.shipment,
+                        name=name,
+                    )
                 group_map[name] = group
 
             for sample in samples:
@@ -1624,13 +1632,24 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
                     'comments': sample['comments'],
                 }
                 if sample.get('name') and sample.get('sample'):  # update entries
-                    models.Sample.objects.filter(project=container.project, pk=sample.get('sample')).update(**info)
+                    if LIMS_USE_PROPOSAL:
+                        models.Sample.objects.filter(proposal=container.proposal, pk=sample.get('sample')).update(**info)
+                    else:
+                        models.Sample.objects.filter(project=container.project, pk=sample.get('sample')).update(**info)
                 elif sample.get('name'):  # create new entry
-                    models.Sample.objects.create(project=container.project, **info)
+                    if LIMS_USE_PROPOSAL:
+                        models.Sample.objects.create(proposal=container.proposal, **info)
+                    else:
+                        models.Sample.objects.create(project=container.project, **info)
                 else:  # delete existing entry
-                    models.Sample.objects.filter(
-                        project=container.project, location_id=sample['location'], container=container
-                    ).delete()
+                    if LIMS_USE_PROPOSAL:
+                        models.Sample.objects.filter(
+                            proposal=container.proposal, location_id=sample['location'], container=container
+                        ).delete()
+                    else:
+                        models.Sample.objects.filter(
+                            project=container.project, location_id=sample['location'], container=container
+                        ).delete()
 
             return JsonResponse({'url': container.get_absolute_url()}, safe=False)
         except models.Container.DoesNotExist:

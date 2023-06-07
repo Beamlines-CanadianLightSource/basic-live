@@ -387,6 +387,10 @@ class AddReport(VerificationMixin, View):
                 proposal = Proposal.objects.get(name__exact=info.get('proposal'))
             except ValueError:
                 raise http.Http404("Proposal does not exist")
+            try:
+                key = make_secure_path(info.get('directory'))
+            except ValueError:
+                return http.HttpResponseServerError("Unable to create SecurePath")
             details = {
                 'project': project,
                 'score': info.get('score') if info.get('score') else 0,
@@ -394,7 +398,7 @@ class AddReport(VerificationMixin, View):
                 'details': info.get('details'),
                 'name': info.get('title'),
                 'files': info.get('files'),
-                'url': info.get('directory'),
+                'url': key,
                 'proposal': proposal
             }
         else:
