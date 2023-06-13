@@ -557,8 +557,6 @@ class ProposalSamples(VerificationMixin, View):
         project_name = kwargs.get('username')
         proposal = kwargs.get('proposal')
 
-        print(collect)
-
         if not isinstance(collect, bool):
             if collect.lower() == 'false':
                 collect = False
