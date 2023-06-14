@@ -480,8 +480,8 @@ class RequestForm(forms.ModelForm):
 
         group = self.initial['groups'].first()
         self.sample = self.initial['samples'].first()
-        group = self.sample.group if self.sample and not group else None
-
+        if not group and self.sample:
+            group = self.sample.group
         shipment = None if not group else group.shipment
         requests = self.initial['project'].requests.exclude(groups=group).filter(
             Q(groups__shipment=shipment) | Q(samples__group__shipment=shipment))
@@ -497,6 +497,7 @@ class RequestForm(forms.ModelForm):
             self.fields['request'].queryset = requests
         else:
             self.fields['request'].widget = forms.HiddenInput()
+
 
         autofill = Div(
             is_requests and Div(
@@ -563,7 +564,8 @@ class RequestParameterForm(forms.ModelForm):
 
         if request:
             self.fields['name'].widget.attrs['readonly'] = True
-            self.fields['comments'].widget.attrs['readonly'] = True
+            if hasattr(self.fields, 'comments'):
+                self.fields['comments'].widget.attrs['readonly'] = True
         if pk:
             self.body.form_action = reverse_lazy('request-edit', kwargs={'pk': self.instance.pk})
             self.footer.layout = Layout(

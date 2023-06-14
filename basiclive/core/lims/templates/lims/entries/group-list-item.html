@@ -28,7 +28,7 @@
             </div>
             {% if editable %}
                 <div class="tools-box">
-                    <a href="#!" data-form-link="{% url 'request-new' %}?groups={{ group.pk }}"
+                    <a href="#!" data-form-link="{% url 'request-new' %}?groups={{ group.pk }}&proposal={{ group.proposal }}"
                         title="Add a Request">
                         {% show_icon label='Request' icon="ti ti-md ti-ruler-pencil" badge="+" color="primary" %}
                     </a>

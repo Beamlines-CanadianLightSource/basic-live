@@ -24,7 +24,7 @@
 
 {% block object_tools %}
     {%  if object.container.status == object.container.STATES.DRAFT or user.is_superuser %}
-        <a href="#!" data-form-link="{% url 'request-new' %}?samples={{ object.pk }}" title="Add a Request">
+        <a href="#!" data-form-link="{% url 'request-new' %}?samples={{ object.pk }}&proposal={{ object.proposal }}" title="Add a Request">
             {% show_icon label='Request' icon="ti ti-md ti-ruler-pencil" badge="+" color="primary" %}
         </a>
         <div class="separator"></div>

@@ -1178,8 +1178,10 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
             groups = models.Group.objects.filter(pk__in=self.request.GET.getlist('groups'))
             if groups:
                 proposal = groups.first().proposal
+            elif samples:
+                proposal = samples.first().proposal
             else:
-                proposal = models.Proposal.objects.filter(name=self.request.GET.get('proposal')).first()
+                proposal = self.request.GET.get('proposal')
             return self.initial_dict.get(step, {
                 'project': project,
                 'proposal': proposal,
@@ -1190,14 +1192,23 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
             start_data = self.storage.get_step_data('start')
             if start_data:
                 kind = start_data.get('start-kind')
+                samples = models.Sample.objects.filter(pk__in=start_data.getlist('start-samples'))
+                groups = models.Group.objects.filter(pk__in=start_data.getlist('start-groups'))
+                if groups:
+                    proposal = groups.first().proposal
+                elif samples:
+                    proposal = samples.first().proposal
+                else:
+                    proposal = start_data.get('start-proposal')
                 return self.initial_dict.get(step, {
                     'kind': kind,
                     'template': start_data.get('start-template'),
                     'request': start_data.get('start-request'),
                     'comments': start_data.get('start-comments'),
                     'name': start_data.get('start-name'),
-                    'samples': models.Sample.objects.filter(pk__in=start_data.getlist('start-samples')),
-                    'groups': models.Group.objects.filter(pk__in=start_data.getlist('start-groups')),
+                    'samples': samples,
+                    'groups': groups,
+                    'proposal': proposal,
                 })
         return self.initial_dict.get(step, {})
 
