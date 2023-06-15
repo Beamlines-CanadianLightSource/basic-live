@@ -1235,8 +1235,7 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
 
 
 class RequestWizardEdit(UserPassesTestMixin, SessionWizardView):
-    form_list = [('start', forms.RequestForm),
-                 ('parameters', forms.RequestParameterForm)]
+    form_list = [('parameters', forms.RequestParameterForm)]
     template_name = "lims/forms/add-request.html"
 
     def get_object(self):
