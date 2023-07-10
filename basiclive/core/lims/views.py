@@ -1622,6 +1622,7 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
                 if LIMS_USE_PROPOSAL:
                     group, created = models.Group.objects.get_or_create(
                         shipment=container.shipment,
+                        project=container.project,
                         name=name, proposal=container.proposal
                     )
                 else:
@@ -1648,7 +1649,7 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
                         models.Sample.objects.filter(project=container.project, pk=sample.get('sample')).update(**info)
                 elif sample.get('name'):  # create new entry
                     if LIMS_USE_PROPOSAL:
-                        models.Sample.objects.create(proposal=container.proposal, **info)
+                        models.Sample.objects.create(project=container.project, proposal=container.proposal, **info)
                     else:
                         models.Sample.objects.create(project=container.project, **info)
                 else:  # delete existing entry

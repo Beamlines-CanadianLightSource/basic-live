@@ -33,6 +33,8 @@
     <!-- User Profile Menu -->
     {% get_setting 'LIMS_USE_PROPOSAL' as use_proposal %}
     {% get_setting 'ENERGY_UNITS' as nrg %}
+    {% get_setting 'MAINTENANCE' as maintenance %}
+
     {% if user.is_authenticated %}
         {% include "lims/navs.html" %}
     {% endif %}
