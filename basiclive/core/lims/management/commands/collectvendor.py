@@ -46,7 +46,11 @@ class Command(BaseCommand):
 
                             # fetch the file from the cdn
                             response = requests.get(url)
-                            response.raise_for_status()
+                            try:
+                                response.raise_for_status()
+                            except Exception as e:
+                                print(f'Raised: {e}')
+                                continue
                             with open(file_path, 'wb') as f:
                                 f.write(response.content)
 

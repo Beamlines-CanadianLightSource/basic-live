@@ -30,6 +30,9 @@
       },
       {
         "path": "http://bl.ocks.org/denisemauldin/raw/e6da337734f855c2a89666afb11dc329/d3.layout.timeline.js"
+      },
+      {
+        "path": "https://d3js.org/d3-hexbin.v0.2.min.js"
       }
     ]
   },

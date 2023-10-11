@@ -11,9 +11,12 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.views.generic import View
+from django.conf import settings
 
 from basiclive.utils.mixins import LoginRequiredMixin, AdminRequiredMixin
 from . import models
+
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class FetchReport(LoginRequiredMixin, View):
@@ -146,9 +149,15 @@ class BulkSampleEdit(LoginRequiredMixin, View):
         errors = []
 
         group = request.POST.get('group')
-        if models.Group.objects.get(pk=group).project.username != self.request.user.username:
-            errors.append('You do not have permission to modify these samples.')
-            return JsonResponse(errors, safe=False)
+        if LIMS_USE_PROPOSAL:
+            proposal = models.Group.objects.get(pk=group).proposal
+            if not proposal.is_team_member(self.request.user.username):
+                errors.append('You do not have permission to modify these samples.')
+                return JsonResponse(errors, safe=False)
+        else:
+            if models.Group.objects.get(pk=group).project.username != self.request.user.username:
+                errors.append('You do not have permission to modify these samples.')
+                return JsonResponse(errors, safe=False)
 
         data = {}
         i = 0
@@ -186,7 +195,7 @@ class UpdateLocations(AdminRequiredMixin, View):
 
 class FetchContainerLayout(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
-        if request.user.is_superuser:
+        if request.user.is_superuser or LIMS_USE_PROPOSAL:
             qs = models.Container.objects.filter()
         else:
             qs = models.Container.objects.filter(project=self.request.user)
@@ -234,6 +243,7 @@ class CreateShipmentSamples(LoginRequiredMixin, View):
                 grouped_samples[sample['group']].append(
                     {
                         'project': shipment.project,
+                        'proposal': shipment.proposal,
                         'container_id': sample['container'],
                         'location_id': sample.get('location') and loc_info[sample['container']][str(sample['location'])] or None
                     }
@@ -257,6 +267,9 @@ class SaveContainerSamples(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         if request.user.is_superuser:
             qs = models.Container.objects.filter()
+        elif LIMS_USE_PROPOSAL:
+            props = models.Project.objects.filter(team_members__username=self.request.user.username).values_list()
+            qs = models.Container.objects.filter(proposal__in=props)
         else:
             qs = models.Container.objects.filter(project=self.request.user)
         try:
@@ -271,7 +284,7 @@ class SaveContainerSamples(LoginRequiredMixin, View):
             for name in groups:
                 group, created = models.Group.objects.get_or_create(
                     project=container.project, shipment=container.shipment,
-                    name=name,
+                    name=name, proposal=container.shipment.proposal
                 )
                 group_map[name] = group
 
@@ -282,6 +295,7 @@ class SaveContainerSamples(LoginRequiredMixin, View):
                     'group': group_map[group_name],
                     'location_id': sample['location'],
                     'container': container,
+                    'proposal': container.proposal,
                     'barcode': sample['barcode'],
                     'comments': sample['comments'],
                 }

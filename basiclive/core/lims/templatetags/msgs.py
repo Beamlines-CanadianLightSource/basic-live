@@ -1,6 +1,6 @@
 from django import template
 from django.template.defaultfilters import stringfilter
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str as force_text
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 from django.contrib import messages

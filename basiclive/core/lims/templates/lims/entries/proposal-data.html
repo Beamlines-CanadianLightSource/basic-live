@@ -1,0 +1,48 @@
+{% extends "lims/base.html" %}
+{% load icons %}
+{% load static %}
+{% load humanize %}
+
+{% block page_heading %}
+    <h3 class="text-condensed">
+        <span class="text-muted">{{ proposal.members|upper }} | </span><strong>{{ proposal.name }}</strong>
+    </h3>
+    <span class="text-muted">
+        Data in Project
+    </span>
+{% endblock %}
+
+{% block object_tools %}
+    <a href="{% url 'proposal-reports' proposal.pk %}" title="Go to Reports in this Project">
+        {% show_icon label='Reports' icon='ti ti-md ti-bar-chart-alt' badge=proposal.reports.count %}
+    </a>
+{% endblock %}
+
+{% block object_status %}
+    <div class="status-bar">
+        <div class="row">
+            <div class="col-4">
+                <small class="text-muted text-condensed">Proposal:</small><br>
+                <a href="{% url 'proposal-detail' proposal.pk %}">{{proposal.name}}</a>
+            </div>
+            <div class="col">
+                <small class="text-muted text-condensed">Total Time:</small><br>
+                {{ proposal.total_time|floatformat }} hour{{ proposal.total_time|pluralize }}
+            </div>
+            <div class="col">
+                <small class="text-muted text-condensed">Start:</small><br>
+                {{ proposal.start|naturalday }}
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block full %}
+
+    <div class="row">
+        <div class="col-sm-12">
+            {% include "itemlist/embed_list.html" %}
+        </div>
+    </div>
+
+{% endblock %}

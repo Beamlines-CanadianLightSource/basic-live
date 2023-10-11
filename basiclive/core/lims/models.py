@@ -15,7 +15,7 @@ from django.db.models import Q, F, Count, CharField, BooleanField, Value, Sum
 from django.db.models.functions import Coalesce, Concat
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 
 from memoize import memoize
 from model_utils import Choices
@@ -29,6 +29,9 @@ IDENTITY_FORMAT = '-%y%m'
 RESTRICT_DOWNLOADS = getattr(settings, 'RESTRICT_DOWNLOADS', False)
 SHIFT_HRS = getattr(settings, 'HOURS_PER_SHIFT', 8)
 SHIFT_SECONDS = SHIFT_HRS * 3600
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', True)
+ENERGY_UNITS = getattr(settings, 'ENERGY_UNITS', 'eV')
+
 
 MAX_CONTAINER_DEPTH = getattr(settings, 'MAX_CONTAINER_DEPTH', 2)
 SAMPLE_PORT_FIELDS = [
@@ -190,11 +193,75 @@ class Project(AbstractUser):
     def save(self, *args, **kwargs):
         if not self.kind:
             self.kind = ProjectType.objects.first()
+        if not self.name:
+            self.name = self.username
         super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("Project Account")
 
+class Proposal(models.Model):
+    """Relational model to authorize data access to proposal directories from listed projects."""
+    name = models.SlugField(unique=True)
+    team_members = models.ManyToManyField(Project, null=True, blank=True, related_name='proposals')
+    kind = models.ForeignKey(ProjectType, blank=True, null=True, on_delete=models.SET_NULL,
+                             verbose_name=_("Project Type"))
+    created = models.DateTimeField(_('date created'), auto_now_add=True, editable=False)
+    modified = models.DateTimeField(_('date modified'), auto_now=True, editable=False)
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return str(self.name) + ": " + ",".join([o.name for o in self.team_members.all()])
+
+    def download_url(self):
+        return 'prj{}.tar.gz'.format(self.name)
+
+    def groups(self):
+        return Group.objects.filter(proposal=self).distinct()
+
+    def is_team_member(self, user):
+        if user in self.team_members.all():
+            return True
+        return False
+
+    def orphans(self):
+        samples = defaultdict(OrphanSample)
+        for data in self.datasets.filter(sample__isnull=True).all():
+            samples[data.name].name = data.name
+            samples[data.name].orphaned_datasets.append(data)
+            samples[data.name].orphaned_reports.extend(data.reports.all())
+
+        return list(samples.values())
+
+    @memoize(60)
+    def members(self):
+        return ", ".join([o.name for o in self.team_members.all()])
+
+    @memoize(60)
+    def total_time(self):
+        """
+        Returns total time the session was active, in hours
+        """
+        total = self.sessions.with_duration().aggregate(time=Sum('duration'))
+        if total['time']:
+            return total['time'].total_seconds() / 3600
+        else:
+            return 0.0
+
+    total_time.short_description = _("Duration")
+
+    @memoize(60)
+    def start(self):
+        return timezone.localtime(self.sessions.earliest('created').start())
+
+    @memoize(60)
+    def end(self):
+        return timezone.localtime(self.sessions.latest('created').end() or timezone.localtime())
+
+    @memoize(60)
+    def last_record_time(self):
+        last_data = self.datasets.last()
+        return last_data.modified if last_data else self.created
 
 class SSHKey(TimeStampedModel):
     name = models.CharField(max_length=60)
@@ -240,6 +307,9 @@ class StretchManager(models.Manager.from_queryset(StretchQuerySet)):
 
 class ProjectObjectManager(models.Manager):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            fields = ['proposal', 'project']
+            return super().get_queryset().select_related(*fields)
         return super().get_queryset().select_related('project')
 
 
@@ -259,6 +329,8 @@ class SessionManager(models.Manager.from_queryset(SessionQuerySet)):
     use_for_related_fields = True
 
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('proposal')
         return super().get_queryset().select_related('project')
 
 
@@ -266,6 +338,8 @@ class Session(models.Model):
     created = models.DateTimeField(_('date created'), auto_now_add=True, editable=False)
     name = models.CharField(max_length=100)
     project = models.ForeignKey(Project, related_name="sessions", on_delete=models.CASCADE)
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='sessions',
+                             verbose_name=_("Project Number"))
     beamline = models.ForeignKey(Beamline, related_name="sessions", on_delete=models.CASCADE)
     comments = models.TextField()
     url = models.CharField(max_length=200, null=True)
@@ -276,6 +350,8 @@ class Session(models.Model):
         ordering = ('-created',)
 
     def __str__(self):
+        if LIMS_USE_PROPOSAL:
+            return '{}-{}'.format(self.proposal.name.upper(), self.name)
         return '{}-{}'.format(self.project.name.upper(), self.name)
 
     def identity(self):
@@ -298,9 +374,13 @@ class Session(models.Model):
         self.stretches.active().update(end=timezone.now())
 
     def groups(self):
+        if LIMS_USE_PROPOSAL:
+            return Group.objects.filter(samples__datasets__session=self, proposal=self.proposal).distinct()
         return Group.objects.filter(samples__datasets__session=self, project=self.project).distinct()
 
     def reports(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.reports.filter(data__session=self).distinct()
         return self.project.reports.filter(data__session=self).distinct()
 
     def orphans(self):
@@ -323,6 +403,8 @@ class Session(models.Model):
     num_reports.short_description = _("Reports")
 
     def samples(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.samples.filter(datasets__session=self).distinct()
         return self.project.samples.filter(datasets__session=self).distinct()
 
     @memoize(60)
@@ -541,6 +623,8 @@ class Shipment(TransitStatusMixin):
         'cascade_help': _('All associated containers will be left without a shipment')
     }
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='shipments')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='shipments',
+                             verbose_name=_("Project Number"))
     comments = models.TextField(blank=True, null=True, max_length=200)
     tracking_code = models.CharField(blank=True, null=True, max_length=60)
     return_code = models.CharField(blank=True, null=True, max_length=60)
@@ -571,12 +655,16 @@ class Shipment(TransitStatusMixin):
         return self.containers.aggregate(sample_count=Count('samples'))['sample_count']
 
     def datasets(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.datasets.filter(sample__container__shipment__pk=self.pk)
         return self.project.datasets.filter(sample__container__shipment__pk=self.pk)
 
     def num_datasets(self):
         return self.datasets().count()
 
     def reports(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.reports.filter(data__sample__container__shipment__pk=self.pk)
         return self.project.reports.filter(data__sample__container__shipment__pk=self.pk)
 
     def num_reports(self):
@@ -607,6 +695,10 @@ class Shipment(TransitStatusMixin):
         return True
 
     def is_processing(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.samples.filter(container__shipment__exact=self).filter(
+            Q(pk__in=self.project.datasets.values('sample')) |
+            Q(pk__in=self.project.result_set.values('sample'))).exists()
         return self.project.samples.filter(container__shipment__exact=self).filter(
             Q(pk__in=self.project.datasets.values('sample')) |
             Q(pk__in=self.project.result_set.values('sample'))).exists()
@@ -639,9 +731,13 @@ class Shipment(TransitStatusMixin):
         return self.groups.order_by('-priority')
 
     def requests(self):
+        if LIMS_USE_PROPOSAL:
+            return  self.proposal.requests.filter(Q(groups__shipment=self) | Q(samples__group__shipment=self)).distinct()
         return self.project.requests.filter(Q(groups__shipment=self) | Q(samples__group__shipment=self)).distinct()
 
     def sample_requests(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.requests.filter(samples__group__shipment=self)
         return self.project.requests.filter(samples__group__shipment=self)
 
     def receive(self, request=None):
@@ -766,6 +862,8 @@ class ContainerQuerySet(models.QuerySet):
 
 class ContainerManager(models.Manager.from_queryset(ContainerQuerySet)):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('kind', 'proposal', 'location').with_port()
         return super().get_queryset().select_related('kind', 'project', 'location').with_port()
 
 
@@ -774,6 +872,8 @@ class Container(TransitStatusMixin):
         'name': _("A visible label on the container. If there is a barcode on the container, scan it here"),
     }
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='containers')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='containers',
+                             verbose_name=_("Project Number"))
     kind = models.ForeignKey(ContainerType, blank=False, null=False, on_delete=models.CASCADE,
                              related_name='containers')
     shipment = models.ForeignKey(Shipment, blank=True, null=True, on_delete=models.SET_NULL, related_name='containers')
@@ -785,12 +885,26 @@ class Container(TransitStatusMixin):
     objects = ContainerManager()
 
     class Meta:
-        unique_together = (
-            ("project", "name", "shipment"),
-        )
+        if LIMS_USE_PROPOSAL:
+            unique_together = (
+                ("proposal", "name", "shipment"),
+            )
+        else:
+            unique_together = (
+                ("project", "name", "shipment"),
+            )
         ordering = ('kind', 'location', 'name')
 
     def __str__(self):
+        if LIMS_USE_PROPOSAL:
+            kind = self.kind.name.title()
+            prop = self.proposal
+            name = self.name
+            if prop:
+                return "{} | {} | {}".format(kind, prop.name.upper(), name)
+            else:
+                return "{} | {} ".format(kind, name)
+
         return "{} | {} | {}".format(self.kind.name.title(), self.project.name.upper(), self.name)
 
     def identity(self):
@@ -831,7 +945,10 @@ class Container(TransitStatusMixin):
         groups = set([])
         for sample in self.samples.all():
             for group in sample.groups.all():
-                groups.add('%s-%s' % (group.project.name, group.name))
+                if LIMS_USE_PROPOSAL:
+                    groups.add('%s-%s' % (group.proposal.name, group.name))
+                else:
+                    groups.add('%s-%s' % (group.project.name, group.name))
         return ', '.join(groups)
 
     def get_group_list(self):
@@ -869,7 +986,7 @@ class Container(TransitStatusMixin):
             {
                 'location': loc
             } if loc not in samples else samples[loc]
-            for loc in self.kind.locations.order_by('pk')
+            for loc in self.kind.locations.order_by('name')
         ]
 
     def get_layout(self, with_samples=True):
@@ -890,6 +1007,7 @@ class Container(TransitStatusMixin):
             'name': self.name,
             'parent': None if not self.parent else self.parent.pk,
             'owner': self.project.name.upper(),
+            'proposal': self.proposal.name.upper(),
             'height': self.kind.height,
             'url': self.get_absolute_url(),
             'loc': self.get_location_name(),
@@ -966,6 +1084,15 @@ class Automounter(models.Model):
     modified = models.DateTimeField('date modified', auto_now=True, editable=False)
     active = models.BooleanField(default=False)
 
+    def proposal(self):
+        return self.container.proposal
+
+    def name(self):
+        return self.__str__()
+
+    def project(self):
+        return self.container.project
+
     def __str__(self):
         return "{} | {}".format(self.beamline.acronym, self.container.name)
 
@@ -973,6 +1100,15 @@ class Automounter(models.Model):
         return 'ATM-{:07,d}'.format(self.id).replace(',', '-')
 
     def json_dict(self):
+        if LIMS_USE_PROPOSAL:
+            return {
+                'project_id': self.project.pk,
+                'proposal_id': self.container.proposal.pk,
+                'id': self.pk,
+                'name': self.beamline.name,
+                'comments': self.staff_comments,
+                'container': [container.pk for container in self.children.all()]
+            }
         return {
             'project_id': self.project.pk,
             'id': self.pk,
@@ -1060,6 +1196,8 @@ class Request(ProjectObjectMixin):
     )
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='requests')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='requests',
+                             verbose_name=_("Project Number"))
     kind = models.ForeignKey(RequestType, on_delete=models.CASCADE, related_name='requests')
     status = models.IntegerField(choices=STATUS_CHOICES, default=STATUS_CHOICES.DRAFT)
     parameters = models.JSONField(blank=True, null=True)
@@ -1121,6 +1259,8 @@ class Group(ProjectObjectMixin):
     TRANSITIONS[ProjectObjectMixin.STATES.DRAFT] = [ProjectObjectMixin.STATES.ACTIVE]
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='sample_groups')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='sample_groups',
+                             verbose_name=_("Project Number"))
     status = models.IntegerField(choices=STATUS_CHOICES, default=ProjectObjectMixin.STATES.DRAFT)
     shipment = models.ForeignKey(Shipment, null=True, blank=True, on_delete=models.SET_NULL, related_name='groups')
     comments = models.TextField(blank=True, null=True)
@@ -1145,6 +1285,8 @@ class Group(ProjectObjectMixin):
         return self.samples.count()
 
     def all_requests(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.requests.filter(Q(groups=self) | Q(samples__group=self)).distinct()
         return self.project.requests.filter(Q(groups=self) | Q(samples__group=self)).distinct()
 
     def complete(self):
@@ -1172,6 +1314,8 @@ class SampleQuerySet(models.QuerySet):
 
 class SampleManager(models.Manager.from_queryset(SampleQuerySet)):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('group', 'location', 'container', 'proposal').with_port()
         return super().get_queryset().select_related('group', 'location', 'container', 'project').with_port()
 
 
@@ -1181,6 +1325,8 @@ class Sample(ProjectObjectMixin):
         'barcode': _("If there is a data-matrix code on sample, please scan or input the value here"),
     }
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='samples')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='samples',
+                             verbose_name=_("Project Number"))
     barcode = models.SlugField(null=True, blank=True)
     container = models.ForeignKey(Container, null=True, blank=True, on_delete=models.CASCADE, related_name='samples')
     location = models.ForeignKey(ContainerLocation, on_delete=models.CASCADE, related_name='samples', null=True, blank=True)
@@ -1208,7 +1354,13 @@ class Sample(ProjectObjectMixin):
         return self.container.automounter()
 
     def reports(self):
+        if LIMS_USE_PROPOSAL:
+            return AnalysisReport.objects.filter(proposal=self.proposal, data__sample=self)
         return AnalysisReport.objects.filter(project=self.project, data__sample=self)
+
+    def requested(self):
+        requests = list(self.requests.all()) + list(self.group.requests.all())
+        return ",".join([f"{r.name}" for r in requests])
 
     def all_requests(self):
         return list(self.requests.all()) + list(self.group.requests.all())
@@ -1284,11 +1436,15 @@ class DataType(models.Model):
 
 class DataManager(models.Manager):
     def get_queryset(self):
+        if LIMS_USE_PROPOSAL:
+            return super().get_queryset().select_related('kind', 'proposal')
         return super().get_queryset().select_related('kind', 'project')
 
 
 class Data(ActiveStatusMixin):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='datasets')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='datasets',
+                             verbose_name=_("Project Number"))
     group = models.ForeignKey(Group, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets')
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets')
     session = models.ForeignKey(Session, null=True, blank=True, on_delete=models.SET_NULL, related_name='datasets')
@@ -1366,11 +1522,14 @@ class Data(ActiveStatusMixin):
 
 class AnalysisReport(ActiveStatusMixin):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='reports')
+    proposal = models.ForeignKey(Proposal, blank=True, null=True, on_delete=models.SET_NULL, related_name='reports',
+                             verbose_name=_("Project Number"))
     kind = models.CharField(max_length=100)
     score = models.FloatField(_("Analysis Report Score"), null=True, default=0.0)
     data = models.ManyToManyField(Data, blank=True, related_name="reports")
     url = models.CharField(max_length=200)
     details = models.JSONField(default=list)
+    files = models.JSONField(default=dict)
 
     objects = ProjectObjectManager()
 
@@ -1378,8 +1537,7 @@ class AnalysisReport(ActiveStatusMixin):
         ordering = ['created', '-score']
 
     def download_url(self):
-        dataset = self.data.first()
-        return '{}/{}-report-{}.tar.gz'.format(self.url, dataset.name, self.pk)
+        return '{}/{}-report-{}.tar.gz'.format(self.url, self.name, self.pk)
 
     def identity(self):
         return 'RPT-{:07,d}'.format(self.id).replace(',', '-')
@@ -1396,14 +1554,18 @@ class AnalysisReport(ActiveStatusMixin):
                 return 'SCR'
             else:
                 return 'NAT'
-        return self.kind[:3].upper()
+        return self.kind.upper().split()[0]
 
     def get_absolute_url(self):
         return reverse('report-detail', kwargs={'pk': self.id})
 
     def sessions(self):
+        if LIMS_USE_PROPOSAL:
+            return self.proposal.sessions.filter(pk__in=self.data.values_list('session__pk', flat=True)).distinct()
         return self.project.sessions.filter(pk__in=self.data.values_list('session__pk', flat=True)).distinct()
 
+    def energy(self):
+        return " | ".join([f"{en:.2f} {ENERGY_UNITS}" for en in self.data.values_list('energy', flat=True)])
 
 class ActivityLogManager(models.Manager):
     def log_activity(self, request, obj, action_type, description=''):

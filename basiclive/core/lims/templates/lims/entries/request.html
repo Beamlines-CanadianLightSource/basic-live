@@ -9,7 +9,11 @@
     <h3>
         <span class="text-thin">Request |</span>
         <span class="text-condensed">
+            {% if use_proposal %}
+            <span class="text-muted">{% if user.is_superuser %}{{ object.proposal.name }} | {% endif %}</span><strong>{{ object.name }}</strong>
+            {% else %}
             <span class="text-muted">{% if user.is_superuser %}{{ object.project }} | {% endif %}</span><strong>{{ object.name }}</strong>
+            {% endif %}
         </span>
     </h3>
     <span class="text-muted">
@@ -19,7 +23,16 @@
 {% endblock %}
 
 {% block object_tools %}
-    {% include "lims/tools-base.html" %}
+    {% if user.is_superuser %}
+        <a href="#!" data-form-link="{% url 'request-admin-edit' pk=object.pk %}">
+            {% show_icon label='Edit' icon='ti ti-md ti-pencil-alt' %}
+        </a>
+        <a href="#!" data-form-link="{% url 'request-delete' pk=object.pk}" >
+            {% show_icon label='Delete' icon='ti ti-md ti-trash' %}
+        </a>
+    {% else %}
+        {% include "lims/tools-base.html" %}
+    {% endif %}
 {% endblock %}
 
 {% block object_status %}

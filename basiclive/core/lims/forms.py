@@ -5,14 +5,17 @@ from collections import OrderedDict
 from crispy_forms.bootstrap import StrictButton
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Field, Layout
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django import forms
 from django.conf import settings
 from django.db.models import Q
 from django.urls import reverse_lazy
 
+
 from .models import Project, Shipment, Automounter, Sample, ComponentType, Container, Group, ContainerLocation, ContainerType
-from .models import Guide, ProjectType, SSHKey, RequestType, Request, REQUEST_SPEC_SCHEMA
+from .models import Guide, ProjectType, SSHKey, RequestType, Request, REQUEST_SPEC_SCHEMA, Proposal
+
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 
 class BodyHelper(FormHelper):
@@ -167,6 +170,43 @@ class NewProjectForm(forms.ModelForm):
                 Div('contact_phone', css_class='col-6'),
                 css_class="form-row"
             )
+        )
+        self.footer.layout = Layout(
+            StrictButton('Save', type='submit', name="submit", value='submit', css_class='btn btn-primary'),
+        )
+
+class ProposalForm(forms.ModelForm):
+    team_members = forms.ModelMultipleChoiceField(label='Members of proposal',
+                                                queryset=Project.objects.all(),
+                                                required=True)
+    class Meta:
+        model = Proposal
+        fields = ('name', 'team_members', 'kind')
+
+    def __init__(self, *args, **kwargs):
+        super(ProposalForm, self).__init__(*args, **kwargs)
+        pk = self.instance.pk
+
+        self.fields['kind'].initial = ProjectType.objects.first()
+        self.body = BodyHelper(self)
+        self.footer = FooterHelper(self)
+        if pk:
+            self.body.title = u"Edit Proposal"
+            self.body.form_action = reverse_lazy('proposal-edit', kwargs={'pk': pk})
+        else:
+            self.body.title = _("Create New Proposal")
+            self.body.form_action = reverse_lazy('new-proposal')
+        self.footer.layout = Layout()
+        self.body.layout = Layout(
+            Div(
+                Div('name', css_class='col-6'),
+                Div(Field('kind', css_class="select"), css_class='col-6'),
+                css_class="form-row"
+            ),
+            Div(
+                Div(Field('team_members', css_class='select'), css_class='col-12'),
+                css_class="form-row"
+            ),
         )
         self.footer.layout = Layout(
             StrictButton('Save', type='submit', name="submit", value='submit', css_class='btn btn-primary'),
@@ -415,22 +455,32 @@ class RequestForm(forms.ModelForm):
 
     class Meta:
         model = Request
-        fields = ('project', 'name', 'comments', 'kind', 'groups', 'samples', 'template', 'request')
-        widgets = {'project': disabled_widget,
-                   'groups': forms.MultipleHiddenInput,
-                   'samples': forms.MultipleHiddenInput,
-                   'comments': forms.Textarea(attrs={'rows': "2"})}
+        if LIMS_USE_PROPOSAL:
+            fields = ('proposal', 'project', 'name', 'comments', 'kind', 'groups', 'samples', 'template', 'request')
+            widgets = {'project': disabled_widget,
+                       'proposal': disabled_widget,
+                       'groups': forms.MultipleHiddenInput,
+                       'samples': forms.MultipleHiddenInput,
+                       'comments': forms.Textarea(attrs={'rows': "2"})}
+        else:
+            fields = ('project', 'name', 'comments', 'kind', 'groups', 'samples', 'template', 'request')
+            widgets = {'project': disabled_widget,
+                       'groups': forms.MultipleHiddenInput,
+                       'samples': forms.MultipleHiddenInput,
+                       'comments': forms.Textarea(attrs={'rows': "2"})}
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         pk = self.instance.pk
         self.body = BodyHelper(self)
         self.footer = FooterHelper(self)
-
+        self.body.title = u"Create New Request"
+        self.body.form_action = reverse_lazy('request-new')
         group = self.initial['groups'].first()
         self.sample = self.initial['samples'].first()
-        group = self.sample.group if self.sample and not group else None
-
+        if not group and self.sample:
+            group = self.sample.group
         shipment = None if not group else group.shipment
         requests = self.initial['project'].requests.exclude(groups=group).filter(
             Q(groups__shipment=shipment) | Q(samples__group__shipment=shipment))
@@ -446,6 +496,7 @@ class RequestForm(forms.ModelForm):
             self.fields['request'].queryset = requests
         else:
             self.fields['request'].widget = forms.HiddenInput()
+
 
         autofill = Div(
             is_requests and Div(
@@ -466,6 +517,7 @@ class RequestForm(forms.ModelForm):
 
         self.body.layout = Layout(
             'project',
+            'proposal',
             autofill,
             Field('name', css_id='name'),
             Field('kind', css_id='kind'),
@@ -483,8 +535,9 @@ class RequestParameterForm(forms.ModelForm):
 
     class Meta:
         model = Request
-        fields = ('kind', 'parameters')
-        widgets = {'kind': disabled_widget,
+        fields = ('kind', 'name', 'parameters')
+        widgets = {'name': disabled_widget,
+                   'kind': disabled_widget,
                    'template': disabled_widget,
                    'request': disabled_widget,
                    'parameters': forms.HiddenInput}
@@ -510,7 +563,8 @@ class RequestParameterForm(forms.ModelForm):
 
         if request:
             self.fields['name'].widget.attrs['readonly'] = True
-            self.fields['comments'].widget.attrs['readonly'] = True
+            if hasattr(self.fields, 'comments'):
+                self.fields['comments'].widget.attrs['readonly'] = True
         if pk:
             self.body.form_action = reverse_lazy('request-edit', kwargs={'pk': self.instance.pk})
             self.footer.layout = Layout(
@@ -1010,11 +1064,19 @@ class ContainerForm(forms.ModelForm):
 class GroupForm(forms.ModelForm):
     class Meta:
         model = Group
-        fields = ('project', 'name', 'comments')
-        widgets = {
-            'project': disabled_widget,
-            'comments': forms.Textarea(attrs={'rows': 5}),
-        }
+        if LIMS_USE_PROPOSAL:
+            fields = ('proposal', 'project', 'name', 'comments')
+            widgets = {
+                'project': disabled_widget,
+                'proposal': disabled_widget,
+                'comments': forms.Textarea(attrs={'rows': 5}),
+            }
+        else:
+            fields = ('project', 'name', 'comments')
+            widgets = {
+                'project': disabled_widget,
+                'comments': forms.Textarea(attrs={'rows': 5}),
+            }
 
     def __init__(self, *args, **kwargs):
         super(GroupForm, self).__init__(*args, **kwargs)
@@ -1028,17 +1090,31 @@ class GroupForm(forms.ModelForm):
         else:
             self.body.title = u"Create New Group"
             self.body.form_action = reverse_lazy("group-new")
-        self.body.layout = Layout(
-            'project',
-            Div(
-                Div('name', css_class="col-12"),
-                css_class="form-row"
-            ),
-            Div(
-                Div('comments', css_class="col-12"),
-                css_class="form-row"
+        if LIMS_USE_PROPOSAL:
+            self.body.layout = Layout(
+                'project',
+                'proposal',
+                Div(
+                    Div('name', css_class="col-12"),
+                    css_class="form-row"
+                ),
+                Div(
+                    Div('comments', css_class="col-12"),
+                    css_class="form-row"
+                )
             )
-        )
+        else:
+            self.body.layout = Layout(
+                'project',
+                Div(
+                    Div('name', css_class="col-12"),
+                    css_class="form-row"
+                ),
+                Div(
+                    Div('comments', css_class="col-12"),
+                    css_class="form-row"
+                )
+            )
         self.footer.layout = Layout(
             StrictButton('Save', type='submit', name="submit", value='submit', css_class='btn btn-primary'),
         )
@@ -1168,26 +1244,51 @@ class LocationLoadForm(forms.ModelForm):
 class AddShipmentForm(forms.ModelForm):
     class Meta:
         model = Shipment
-        fields = ('name', 'comments', 'project')
+        if LIMS_USE_PROPOSAL:
+            fields = ('name', 'comments', 'project', 'proposal')
+        else:
+            fields = ('name', 'comments', 'project')
         widgets = {
             'comments': forms.Textarea(),
         }
 
     def __init__(self, *args, **kwargs):
         super(AddShipmentForm, self).__init__(*args, **kwargs)
-
+        if LIMS_USE_PROPOSAL:
+            self.fields['proposal'].initial = self.initial['project'].proposals.first()
+            self.fields['proposal'].queryset = self.initial['project'].proposals.filter(active=True)
         if self.initial['project'].is_superuser:
-            name_row = Div(
-                Div(Field('project', css_class="select"), css_class="col-4"),
-                Div('name', css_class="col-8"),
-                css_class="form-row"
-            )
+            if LIMS_USE_PROPOSAL:
+                self.fields['proposal'].queryset = Proposal.objects.all()
+                self.fields['project'].widget = forms.HiddenInput()
+                name_row = Div(
+                    Div(
+                        Div(Field('project', hidden=True)),
+                        Div(Field('proposal', css_class="select"), css_class="col-4"),
+                        Div('name', css_class="col-8"),
+                        css_class="form-row"
+                    ),
+                )
+            else:
+                name_row = Div(
+                    Div(Field('project', css_class="select"), css_class="col-4"),
+                    Div('name', css_class="col-8"),
+                    css_class="form-row"
+                )
         else:
             self.fields['project'].widget = forms.HiddenInput()
-            name_row = Div(
-                Field('project', hidden=True),
-                Field('name', css_class="col-12")
-            )
+            if LIMS_USE_PROPOSAL:
+                name_row = Div(
+                    Div(Field('project', hidden=True)),
+                    Div(Field('proposal', css_class="select"), css_class="col-4"),
+                    Div('name', css_class="col-8"),
+                    css_class="form-row"
+                )
+            else:
+                name_row = Div(
+                    Field('project', hidden=True),
+                    Field('name', css_class="col-12")
+                )
 
         self.body = BodyHelper(self)
         self.body.title = "Create a Shipment"

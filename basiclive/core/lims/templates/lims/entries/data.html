@@ -16,7 +16,7 @@
 {% block modal_styles %}data-viewer{% endblock %}
 
 {% block modal_title %}
-    Data | {% if request.user.is_superuser %}<span class="text-muted">{{ object.project | upper }} | </span>{% endif %}
+    Data | {% if request.user.is_superuser %}<span class="text-muted">{% if use_proposal %} {{ object.proposal }} {% else %}} {{ object.project | upper }}{% endif%}} | </span>{% endif %}
     <strong>{{ object.name }}</strong>
 {% endblock %}
 

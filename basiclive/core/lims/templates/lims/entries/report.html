@@ -6,6 +6,7 @@
 {% load icons %}
 {% load jsutils %}
 
+
 {% block extra_css %}
     <link href="{% static "misc/css/c3.min.css" %}" rel="stylesheet">
     <link href="{% static "lims/css/reports.min.css" %}" rel="stylesheet">
@@ -44,6 +45,10 @@
                 {% endif %}
             </div>
             <div class="col">
+                <small class="text-muted text-condensed">Energy ({{ nrg }}):</small><br>
+                {% for data in object.data.all %}<a data-link="{% url 'data-detail' data.pk %}">{{ data.energy|floatformat:2 }}</a>{% if not forloop.last %}<span class="text-muted"> | </span>{% endif %}{% endfor %}
+            </div>
+            <div class="col">
                 <small class="text-muted text-condensed">Data:</small><br>
                 {% for data in object.data.all %}<a data-link="{% url 'data-detail' data.pk %}">{{ data.name }}</a>{% if not forloop.last %}<span class="text-muted"> | </span>{% endif %}{% endfor %}
             </div>
@@ -60,7 +65,11 @@
     <h4>
         <span class="text-thin">Analysis Report |</span>
         <span class="text-condensed">
+        {% if use_proposal %}
+            <span class="text-muted">{{ object.proposal.name }} | </span><strong>{{ object.name }}</strong>
+        {% else %}
             <span class="text-muted">{% if user.is_superuser %}{{ object.project }} | {% endif %}</span><strong>{{ object.name }}</strong>
+        {% endif %}
         </span>
     </h4>
     <span class="text-muted">
@@ -76,6 +85,7 @@
 {% block extra_js %}
     <script type="text/javascript" src="{% static 'lims/vendor/d3/js/d3.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'lims/vendor/d3/js/d3-legend.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'lims/vendor/d3/js/d3-hexbin.v0.2.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'lims/vendor/misc/js/showdown.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'lims/vendor/misc/js/c3.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'lims/js/mxlive-reports.min.js' %}"></script>

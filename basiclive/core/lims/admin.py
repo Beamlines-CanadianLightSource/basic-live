@@ -1,15 +1,21 @@
 from django.contrib import admin
 from basiclive.core.lims import models
+from django.conf import settings
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
 
 
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('identity', 'project')
-    search_fields = ('name', 'project')
+    if LIMS_USE_PROPOSAL:
+        list_display = ('identity', 'name', 'proposal', 'project')
+        search_fields = ('name', 'proposal__name')
+    else:
+        list_display = ('identity', 'project')
+        search_fields = ('name', 'project__username')
 
 
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('name', 'contact_person', 'email')
-    search_fields = ('name', 'contact_person')
+    list_display = ('username', 'contact_person', 'email')
+    search_fields = ('username', 'contact_person')
 
 class LocationAdmin(admin.ModelAdmin):
     list_filter = ('kind',)
@@ -17,7 +23,7 @@ class LocationAdmin(admin.ModelAdmin):
 admin.site.register(models.Guide)
 admin.site.register(models.Beamline)
 admin.site.register(models.Carrier)
-admin.site.register(models.Automounter)
+admin.site.register(models.Automounter, ProjectAdmin)
 admin.site.register(models.ProjectType)
 admin.site.register(models.ProjectDesignation)
 admin.site.register(models.Project, UserAdmin)

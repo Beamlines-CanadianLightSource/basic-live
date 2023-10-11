@@ -45,6 +45,11 @@
             {% show_icon label="Remote" icon="ti ti-md ti-rss-alt" %}
         </a>
     {% endif %}
+    {% if use_proposal %}
+        <a  href="{% url 'proposal-list' %}">
+            {% show_icon label="Proposals" icon="ti ti-md ti-folder" %}
+        </a>
+    {% endif %}
     <a  href="{% url 'session-list' %}">
         {% show_icon label="Sessions" icon="ti ti-md ti-calendar" %}
     </a>

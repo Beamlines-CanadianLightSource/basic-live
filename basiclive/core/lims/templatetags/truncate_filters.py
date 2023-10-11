@@ -13,4 +13,11 @@ def truncate_chars(value, max_length):
         if rightmost_space != -1:  
             truncd_val = truncd_val[:rightmost_space]  
    
-    return truncd_val + "..."  
+    return truncd_val + "..."
+
+
+@register.filter("truncate_csv")
+def truncate_csv(value, max_length):
+    truncd_val = ",".join(value.split(',')[0:max_length])
+
+    return truncd_val + "..."

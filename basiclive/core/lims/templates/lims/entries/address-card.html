@@ -13,7 +13,11 @@
       </div>
       <div class="col-6">
         <div class="mini-profile text-right">
+            {% if use_proposal %}
+            <span class="text-condensed text-muted">{{ object.designation|default_if_none:"NAME" }}:</span>
+            {% else %}
             <span class="text-condensed text-muted">PRINCIPAL INVESTIGATOR:</span>
+            {% endif %}
             <strong>{{ object.first_name }} {{ object.last_name }}</strong><br/>
             {% if object.email %}{{ object.email }}{% endif %}<br/>
             {% if object.contact_fax %}

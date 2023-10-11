@@ -13,11 +13,12 @@ django-crispy-forms
 django-debug-toolbar
 django-debug-toolbar-request-history
 django-formtools
-django-itemlist==0.2.10
+django-itemlist==0.2.12
 django-memoize
 django-model-utils
 django-proxy
 django-python3-ldap
+django-crispy-forms==1.14.0
 geopy
 habanero
 idna

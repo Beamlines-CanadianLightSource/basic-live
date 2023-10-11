@@ -12,7 +12,7 @@ function renderMarkdown(text) {
 }
 
 const figureTypes = [
-    "histogram", "lineplot", "barchart", "scatterplot", "pie", "gauge", "timeline", "columnchart"
+    "histogram", "lineplot", "barchart", "scatterplot", "pie", "gauge", "timeline", "columnchart", "heatmap"
 ];
 
 let ColorSchemes = {
@@ -699,6 +699,237 @@ function drawTimeline(figure, chart, options) {
     }
 }
 
+function getUnique(arr){
+    let res = arr.map(x => x.toFixed(3));
+    return [...new Set(res)]
+}
+
+function drawHeatMap (figure, chart, options) {
+    //Heatmap binned with hexbin, https://github.com/d3/d3-hexbin
+    let margin = {top: 20, right: 20, bottom: 35, left: 40};
+    let width = options.width - margin.left - margin.right;
+    let height = options.height - margin.bottom - margin.top;
+    let xlabel = chart.data.x.shift();
+    let ylabel = chart.data.y.shift();
+    let zlabel = chart.data.z.map((e,i) => e.shift());
+    let enabled = d3.range(zlabel.length);
+    if(typeof(chart.data.selected) !== 'undefined'){
+        enabled = d3.range(zlabel.length).filter((elem,i)=> {return chart.data.selected.indexOf(elem)});
+    }
+    let zed = d3.range(chart.data.x.length).map(i =>
+        enabled.reduce((x,e) => x + chart.data.z[e][i], 0)/enabled.length);
+    let xmin = d3.min(chart.data.x);
+    let xmax = d3.max(chart.data.x);
+    let ymin = d3.min(chart.data.y);
+    let ymax = d3.max(chart.data.y);
+    const font = "11px Fira Code";
+    let data = chart.data.x.map((e,i) => {return {"x": e, "y":chart.data.y[i], "z": zed[i]}})
+
+    let detcolors = d3.scaleOrdinal().domain(zlabel).range(options.scheme);
+
+
+    // Build color scale 500 bits
+    let colorScale = d3.scaleQuantile()
+        .domain([d3.min(zed), d3.max(zed)])
+        .range(d3.range(0, 1.002, 0.002));
+
+    // Take average bin values
+    let color = (d) =>{
+        let l = d.length
+        let z = d.map((coord) => data.find(e => e.x == coord.x && e.y == coord.y).z).reduce((x,y) => x+y)
+        return colorScale(z/l)
+    }
+
+    //Get # of columns and rows from report
+    // Hexradius taken from https://www.visualcinnamon.com/2013/07/self-organizing-maps-creating-hexagonal/
+    let MapColumns = getUnique(chart.data.x).length,
+        MapRows = getUnique(chart.data.y).length;
+
+    //The maximum radius the hexagons can have to still fit the screen
+    let hexRadius = 1.25*d3.max([width / ((MapColumns + 0.5) * Math.sqrt(3)),
+         height / ((MapRows + 1 / 3) * 1.5)]);
+
+    //Create hex centres
+    let x = d3.scaleLinear()
+            .domain([xmin, xmax])
+            .rangeRound([width, 0])
+
+    let y = d3.scaleLinear()
+            .domain([ymin, ymax])
+            .rangeRound([height, 0])
+
+    const hexbin = d3.hexbin()
+        .x(d => x(d.x))
+        .y(d => y(d.y))
+        .radius(hexRadius)
+        .extent([[0, 0], [width, height]]);
+
+    //Create x and y axis
+    let y_scale = d3.scaleLinear()
+        .domain([ymax, ymin])
+        .range([height, 0]);
+    let yaxis = d3.axisLeft().scale(y_scale).ticks(15);
+
+
+    let x_scale = d3.scaleLinear()
+        .domain([xmax, xmin])
+        .range([0, width]);
+    let xaxis = d3.axisBottom().scale(x_scale).ticks(15);
+
+
+    // Create canvas
+    let svg = d3.select(`#${figure.attr('id')}`)
+        .append('svg')
+        .attr('viewBox', `-${margin.left} -${margin.top} ${width+margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+        .attr('class', 'w-100');
+
+    //Calculate the center position of each hexagon
+    let points = d3.range(chart.data.x.length).map((e,i) => { return {"x" :chart.data.x[i], "y": chart.data.y[i]}; });
+    let bins = hexbin(points);
+
+    //tooltip functions https://d3-graph-gallery.com/graph/interactivity_tooltip.html
+    // create a tooltip
+    let tooltip = d3.select(`#${figure.attr('id')}`)
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px")
+
+    // Three functions that change the tooltip when user hover / move / leave a cell
+    let mouseover = function (d) {
+        tooltip
+            .style("opacity", 1)
+    }
+    let mousemove = function (d, i) {
+        tooltip
+            .html(`(x, y) = (${d[0].x.toFixed(3)}, ${-1*d[0].y.toFixed(3)})`)
+            .style("left", (d3.mouse(this)[0] + d.x + margin.left)  + "px")
+            .style("top", (d3.mouse(this)[1] + d.y + margin.bottom) + "px")
+    }
+    let mouseleave = function (d) {
+        tooltip
+            .style("opacity", 0)
+    }
+
+    //Draw the hexagons
+    let hexagon = svg.append("g")
+        .selectAll("path")
+        .data(bins)
+        .join("path")
+            .attr("d", hexbin.hexagon())
+            .attr("transform", d => `translate(${d.x},${d.y})`)
+            .attr("data-label", (d, i) => `${points[i].x}, ${points[i].y} : ${zed[i]}`)
+            .style("fill", function (d) {
+                return d3.interpolateViridis(color(d))
+            })
+            .on("mouseover", mouseover)
+            .on("mousemove", mousemove)
+            .on("mouseleave", mouseleave);
+
+    //Add chart axes
+    svg.append("g")
+        .attr('transform', `translate(0, ${height})`)
+        .style("font", font)
+        .call(xaxis)
+    svg.append("text")
+        .attr("transform", "translate(" + (width - margin.right) + " ," + (height + margin.top + 10) + ")")
+        .style("text-anchor", "middle")
+        .style('font', font)
+        .text(xlabel);
+
+    svg.append("g")
+        .call(yaxis)
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - margin.left)
+        .attr("x", 0 - margin.top)
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .style('font', font)
+        .text(ylabel);
+
+   // Add legend
+    let size = 12;
+    let left = 0;
+    let offset = 50;
+    let legend = svg.append("g");
+    let legends = legend.selectAll(".legend")
+        .data(zlabel)
+        .enter()
+        .append("g")
+        .attr('class', "legend")
+        .attr('data-type', function (d, i) {
+            return d
+        })
+        .attr('transform', function (d, i) {
+            if (i === 0) {
+                left = d.length + offset;
+                return "translate(0,0)"
+            } else {
+                let curpos = left;
+                left += d.length + offset;
+                return `translate(${curpos}, 0)`;
+            }
+        })
+        // Choose detector channels for heatmap.
+        .on('click', function () {
+            let selector = $(this).data('type');
+            let zindex = zlabel.indexOf(selector)
+            let on = enabled.indexOf(zindex);
+            if(on !== -1){
+                if (enabled.length == 1){
+                    return
+                }
+                enabled = enabled.filter((e,i) => e !== zindex)
+                svg.selectAll(`rect[data-type="${selector}"]`)
+                    .style('opacity', .1);
+            }else{
+                enabled.push(zlabel.indexOf(selector))
+                svg.selectAll(`rect[data-type="${selector}"]`)
+                    .style('opacity', 1);
+            }
+            let l = enabled.length
+            zed = d3.range(chart.data.x.length).map(i => enabled.reduce((x,e) => x + chart.data.z[e][i],0)/l)
+            console.log(d3.max(zed), enabled)
+            colorScale = d3.scaleQuantile()
+                .domain([d3.min(zed), d3.max(zed)])
+                .range(d3.range(0, 1.002, 0.002));
+            data = chart.data.x.map((e,i) => {return {"x": e, "y":chart.data.y[i], "z": zed[i]}})
+            hexagon
+                .style("fill", function (d) {
+                        return d3.interpolateViridis(color(d))
+                });
+
+        });
+
+    legends.append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', size)
+        .attr('height', size)
+        .attr('data-type', function (d, i) {
+            return d
+        })
+        .style("fill", d => detcolors(d));
+    legends.append('text')
+        .attr('x', size + 10)
+        .attr('y', size)
+        .text(function (d, i) {
+            return d
+        })
+        .style('text-anchor', 'start')
+        .style('font', font);
+
+    // center legend in position
+    let legendx =  width/2  - offset*zlabel.length/2;
+    let legendy = height + margin.top  ;
+    legend.attr('transform', `translate(${legendx}, ${legendy})`);
+}
+
 (function ($) {
     $.fn.liveReport = function (options) {
         let target = $(this);
@@ -755,6 +986,9 @@ function drawTimeline(figure, chart, options) {
                     break;
                 case 'timeline':
                     drawTimeline(figure, chart, options);
+                    break;
+                case 'heatmap':
+                    drawHeatMap(figure, chart, options);
                     break;
             }
 

@@ -40,7 +40,15 @@ class AsyncFormMixin(object):
         # it might do some processing (in the case of CreateView, it will
         # call form.save() for example).
         response = super().form_valid(form)
-        if self.request.is_ajax():
+        if 'ASGIRequest' in str(type(self.request)):
+            ajax = True
+        else:
+            try:
+                ajax = self.request.is_ajax()
+            except AttributeError:
+                ajax = True
+
+        if ajax:
             data = {
                 'modal': self.modal_response,
                 'url': self.get_success_url(),

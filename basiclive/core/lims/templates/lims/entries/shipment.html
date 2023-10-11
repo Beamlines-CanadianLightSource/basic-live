@@ -16,7 +16,11 @@
     <h3>
         <span class="text-thin">Shipment |</span>
         <span class="text-condensed">
+            {% if use_proposal %}
+            <span class="text-muted">{{ shipment.proposal.name }} | </span><strong>{{ shipment.name }}</strong>
+            {% else %}
             <span class="text-muted">{% if user.is_superuser %}{{ shipment.project }} | {% endif %}</span><strong>{{ shipment.name }}</strong>
+            {% endif %}
         </span>
     </h3>
     <span class="text-muted">

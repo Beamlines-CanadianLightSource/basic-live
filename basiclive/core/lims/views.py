@@ -19,7 +19,6 @@ from formtools.wizard.views import SessionWizardView
 from itemlist.views import ItemListView
 from proxy.views import proxy_view
 
-
 from basiclive.utils import filters
 from basiclive.utils.mixins import AsyncFormMixin, AdminRequiredMixin, HTML2PdfMixin, PlotViewMixin
 from . import forms, models, stats
@@ -27,6 +26,8 @@ from . import forms, models, stats
 DOWNLOAD_PROXY_URL = getattr(settings, 'DOWNLOAD_PROXY_URL', "http://basiclive.core-data/download")
 LIMS_USE_SCHEDULE = getattr(settings, 'LIMS_USE_SCHEDULE', False)
 LIMS_USE_ACL = getattr(settings, 'LIMS_USE_ACL', False)
+LIMS_USE_PROPOSAL = getattr(settings, 'LIMS_USE_PROPOSAL', False)
+CERT_KEY = getattr(settings, 'DOWNLOAD_PROXY_CERT', False)
 
 if LIMS_USE_SCHEDULE:
     from basiclive.core.schedule.models import AccessType, BeamlineSupport, Beamtime
@@ -74,17 +75,79 @@ class ProjectDetail(UserPassesTestMixin, detail.DetailView):
         context = super(ProjectDetail, self).get_context_data(**kwargs)
         now = timezone.now()
         one_year_ago = now - timedelta(days=365)
+        two_years_ago = now - timedelta(days=730)
+
         project = self.request.user
-        shipments = project.shipments.filter(
-            Q(status__lt=models.Shipment.STATES.RETURNED)
-            | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
-        ).annotate(
-            data_count=Count('containers__samples__datasets', distinct=True),
-            report_count=Count('containers__samples__datasets__reports', distinct=True),
-            sample_count=Count('containers__samples', distinct=True),
-            group_count=Count('groups', distinct=True),
-            container_count=Count('containers', distinct=True),
-        ).order_by('status', '-date_shipped', '-created').prefetch_related('project')
+        if LIMS_USE_PROPOSAL:
+            props = project.proposals.filter(created__gt=two_years_ago).all()
+            for i, p in enumerate(props):
+                if i == 0:
+                    shipments = p.shipments.filter(
+                        Q(status__lt=models.Shipment.STATES.RETURNED)
+                        | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
+                    ).annotate(
+                        data_count=Count('containers__samples__datasets', distinct=True),
+                        report_count=Count('containers__samples__datasets__reports', distinct=True),
+                        sample_count=Count('containers__samples', distinct=True),
+                        group_count=Count('groups', distinct=True),
+                        container_count=Count('containers', distinct=True),
+                    ).order_by('status', '-date_shipped', '-created').prefetch_related('proposal')
+
+                    sessions = p.sessions.filter(
+                        created__gt=one_year_ago
+                    ).annotate(
+                        data_count=Count('datasets', distinct=True),
+                        report_count=Count('datasets__reports', distinct=True),
+                        last_record=Max('datasets__end_time'),
+                        end=Max('stretches__end')
+                    ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project',
+                                                                                                   'beamline')[:7]
+                else:
+                    shipments.union(
+                        p.shipments.filter(
+                            Q(status__lt=models.Shipment.STATES.RETURNED)
+                            | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
+                        ).annotate(
+                            data_count=Count('containers__samples__datasets', distinct=True),
+                            report_count=Count('containers__samples__datasets__reports', distinct=True),
+                            sample_count=Count('containers__samples', distinct=True),
+                            group_count=Count('groups', distinct=True),
+                            container_count=Count('containers', distinct=True),
+                        ).order_by('status', '-date_shipped', '-created').prefetch_related('proposal')
+                    )
+                    sessions.union(
+                        p.sessions.filter(
+                            created__gt=one_year_ago
+                        ).annotate(
+                            data_count=Count('datasets', distinct=True),
+                            report_count=Count('datasets__reports', distinct=True),
+                            last_record=Max('datasets__end_time'),
+                            end=Max('stretches__end')
+                        ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project',
+                                                                                                       'beamline')[:7]
+                    )
+
+        else:
+
+            shipments = project.shipments.filter(
+                Q(status__lt=models.Shipment.STATES.RETURNED)
+                | Q(status=models.Shipment.STATES.RETURNED, date_returned__gt=one_year_ago)
+            ).annotate(
+                data_count=Count('containers__samples__datasets', distinct=True),
+                report_count=Count('containers__samples__datasets__reports', distinct=True),
+                sample_count=Count('containers__samples', distinct=True),
+                group_count=Count('groups', distinct=True),
+                container_count=Count('containers', distinct=True),
+            ).order_by('status', '-date_shipped', '-created').prefetch_related('project')
+
+            sessions = project.sessions.filter(
+                created__gt=one_year_ago
+            ).annotate(
+                data_count=Count('datasets', distinct=True),
+                report_count=Count('datasets__reports', distinct=True),
+                last_record=Max('datasets__end_time'),
+                end=Max('stretches__end')
+            ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project', 'beamline')[:7]
 
         if LIMS_USE_SCHEDULE:
             access_types = AccessType.objects.all()
@@ -92,15 +155,6 @@ class ProjectDetail(UserPassesTestMixin, detail.DetailView):
                 current=Case(When(start__lte=now, then=Value(True)), default=Value(False), output_field=BooleanField())
             ).order_by('-current', 'start')
             context.update(beamtimes=beamtimes, access_types=access_types)
-
-        sessions = project.sessions.filter(
-            created__gt=one_year_ago
-        ).annotate(
-            data_count=Count('datasets', distinct=True),
-            report_count=Count('datasets__reports', distinct=True),
-            last_record=Max('datasets__end_time'),
-            end=Max('stretches__end')
-        ).order_by('-end', 'last_record', '-created').with_duration().prefetch_related('project', 'beamline')[:7]
 
         context.update(shipments=shipments, sessions=sessions)
         return context
@@ -192,7 +246,8 @@ class StaffDashboard(AdminRequiredMixin, detail.DetailView):
             })
         # Users remotely connected, but not scheduled and without an active session
         if LIMS_USE_ACL:
-            for user in active_access.exclude(pk__in=[c.pk for c in connections]).values_list('user', flat=True).distinct():
+            for user in active_access.exclude(pk__in=[c.pk for c in connections]).values_list('user',
+                                                                                              flat=True).distinct():
                 user_conns = active_access.exclude(pk__in=[c.pk for c in connections]).filter(user__pk=user)
                 access_info.append({
                     'user': models.Project.objects.get(pk=user),
@@ -206,7 +261,8 @@ class StaffDashboard(AdminRequiredMixin, detail.DetailView):
             access_info[i]['shipments'] = shipments.filter(project=conn['user']).count()
             access_info[i]['connections'] = LIMS_USE_ACL and {
                 access.name: access_info[i]['connections'].filter(userlist=access)
-                for access in AccessList.objects.filter(pk__in=access_info[i]['connections'].values_list('userlist__pk', flat=True)).distinct()
+                for access in AccessList.objects.filter(
+                    pk__in=access_info[i]['connections'].values_list('userlist__pk', flat=True)).distinct()
             } or {}
 
         context.update(connections=access_info, adaptors=adaptors, shipments=shipments, beamlines=beamlines)
@@ -217,7 +273,7 @@ class ProjectReset(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit
     template_name = "lims/forms/project-reset.html"
     model = models.Project
     success_message = "Account API key reset"
-    fields = ("key", )
+    fields = ("key",)
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -266,6 +322,11 @@ class OwnerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     owner_field = 'project'
 
     def test_func(self):
+        if LIMS_USE_PROPOSAL:
+            if not hasattr(self.get_object(), 'proposal'):
+                return self.request.user.is_superuser or self.get_object().is_team_member(self.request.user)
+            return self.request.user.is_superuser or getattr(self.get_object(), 'proposal').is_team_member(
+                self.request.user)
         return self.request.user.is_superuser or getattr(self.get_object(), self.owner_field) == self.request.user
 
 
@@ -318,6 +379,8 @@ class ListViewMixin(LoginRequiredMixin):
 
     def get_list_columns(self):
         columns = super().get_list_columns()
+        if LIMS_USE_PROPOSAL and self.show_project:
+            return ['proposal__name'] + columns
         if self.request.user.is_superuser and self.show_project:
             return ['project__name'] + columns
         return columns
@@ -325,7 +388,12 @@ class ListViewMixin(LoginRequiredMixin):
     def get_queryset(self):
         selector = {}
         if not self.request.user.is_superuser:
-            selector = {'project': self.request.user}
+            if LIMS_USE_PROPOSAL and self.show_project:
+                project = self.request.user
+                proposals = project.proposals.values_list('pk', flat=True)
+                selector = {'proposal__in': proposals}
+            elif self.show_project:
+                selector = {'project': self.request.user}
         return super().get_queryset().filter(**selector)
 
     def page_title(self):
@@ -355,8 +423,13 @@ class DetailListMixin(OwnerRequiredMixin):
 class ShipmentList(ListViewMixin, ItemListView):
     model = models.Shipment
     list_filters = ['created', 'status']
-    list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
-    list_search = ['project__username', 'project__name', 'name', 'comments', 'status']
+    if LIMS_USE_PROPOSAL:
+        list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
+        list_search = ['proposal__name', 'project__name', 'name', 'comments', 'status']
+        link_field = 'name'
+    else:
+        list_columns = ['id', 'name', 'date_shipped', 'carrier', 'num_containers', 'status']
+        list_search = ['project__username', 'project__name', 'name', 'comments', 'status']
     link_url = 'shipment-detail'
     link_data = False
     ordering = ['status', '-modified']
@@ -595,7 +668,6 @@ class RequestTypeLayout(RequestTypeEdit):
     template_name = "lims/forms/add-wizard.html"
 
 
-
 class RequestTypeView(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.UpdateView):
     form_class = forms.RequestParameterForm
     template_name = "modal/form.html"
@@ -609,9 +681,15 @@ class RequestTypeView(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, e
 
 class SampleList(ListViewMixin, ItemListView):
     model = models.Sample
-    list_filters = ['modified']
-    list_columns = ['id', 'name', 'comments', 'container', 'location']
-    list_search = ['project__name', 'name', 'barcode', 'comments']
+    if LIMS_USE_PROPOSAL:
+        list_filters = ['proposal__name', 'modified']
+        list_columns = ['id', 'name', 'comments', 'container', 'location']
+        list_search = ['proposal__name', 'name', 'barcode', 'comments']
+        link_field = 'name'
+    else:
+        list_filters = ['modified']
+        list_columns = ['id', 'name', 'comments', 'container', 'location']
+        list_search = ['project__name', 'name', 'barcode', 'comments']
     link_url = 'sample-detail'
     ordering = ['-created', '-priority']
     ordering_proxies = {}
@@ -664,9 +742,14 @@ class SampleDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit
 
 class ContainerList(ListViewMixin, ItemListView):
     model = models.Container
-    list_filters = ['modified', 'kind', 'status']
     list_columns = ['name', 'id', 'shipment', 'kind', 'capacity', 'num_samples', 'status']
-    list_search = ['project__name', 'name', 'comments']
+    if LIMS_USE_PROPOSAL:
+        list_filters = ['proposal__name', 'modified', 'kind', 'status']
+        list_search = ['proposal__name', 'name', 'comments']
+        link_field = 'name'
+    else:
+        list_filters = ['modified', 'kind', 'status']
+        list_search = ['project__name', 'name', 'comments']
     link_url = 'container-detail'
     ordering = ['-created']
     ordering_proxies = {}
@@ -676,7 +759,7 @@ class ContainerList(ListViewMixin, ItemListView):
 class ContainerDetail(DetailListMixin, SampleList):
     extra_model = models.Container
     template_name = "lims/entries/container.html"
-    list_columns = ['name', 'barcode', 'group', 'location', 'comments']
+    list_columns = ['name', 'barcode', 'group', 'location', 'comments', 'requested']
     link_url = 'sample-detail'
     show_project = False
 
@@ -805,9 +888,15 @@ class ContainerDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, e
 
 class GroupList(ListViewMixin, ItemListView):
     model = models.Group
-    list_filters = ['modified', 'status']
-    list_columns = ['id', 'name', 'num_samples', 'status']
-    list_search = ['project__name', 'comments', 'name']
+    if LIMS_USE_PROPOSAL:
+        list_filters = ['proposal__name', 'modified', 'status']
+        list_columns = ['id', 'name', 'num_samples', 'status']
+        list_search = ['proposal__name', 'comments', 'name']
+        link_field = 'name'
+    else:
+        list_filters = ['modified', 'status']
+        list_columns = ['id', 'name', 'num_samples', 'status']
+        list_search = ['project__name', 'comments', 'name']
     link_url = 'group-detail'
     ordering = ['-modified', '-priority']
     ordering_proxies = {}
@@ -876,9 +965,14 @@ class GroupDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.
 
 class DataList(ListViewMixin, ItemListView):
     model = models.Data
-    list_filters = ['modified', filters.YearFilterFactory('modified'), 'kind', 'beamline']
-    list_columns = ['id', 'name', 'sample', 'frame_sets', 'session__name', 'energy', 'beamline', 'kind', 'modified']
-    list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'project__name', 'modified']
+    if LIMS_USE_PROPOSAL:
+        list_filters = ['proposal__name', 'modified', filters.YearFilterFactory('modified'), 'kind', 'beamline']
+        list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'created', 'modified']
+        list_columns = ['id', 'name', 'sample', 'frame_sets', 'session__name', 'energy', 'beamline', 'kind', 'modified']
+    else:
+        list_filters = ['modified', filters.YearFilterFactory('modified'), 'kind', 'beamline']
+        list_search = ['id', 'name', 'beamline__name', 'sample__name', 'frames', 'project__name', 'modified']
+        list_columns = ['id', 'name', 'sample', 'frame_sets', 'session__name', 'energy', 'beamline', 'kind', 'modified']
     link_url = 'data-detail'
     link_field = 'name'
     link_attr = 'data-link'
@@ -891,14 +985,14 @@ class DataList(ListViewMixin, ItemListView):
 
 
 class DataStats(PlotViewMixin, DataList):
-    plot_fields = { 'beam_size': {'kind': 'pie'},
-                    'kind__name': {'kind': 'columnchart'},
-                    'reports__score': {'kind': 'histogram', 'range': (0.01, 1)},
-                    'energy': {'kind': 'histogram', 'range': (4., 18.), 'bins': 8},
-                    'exposure_time': {'kind': 'histogram', 'range': (0.01, 20)},
-                    'attenuation': {'kind': 'histogram'},
-                    'num_frames': {'kind': 'histogram'},
-                    }
+    plot_fields = {'beam_size': {'kind': 'pie'},
+                   'kind__name': {'kind': 'columnchart'},
+                   'reports__score': {'kind': 'histogram', 'range': (0.01, 1)},
+                   'energy': {'kind': 'histogram', 'range': (4., 18.), 'bins': 8},
+                   'exposure_time': {'kind': 'histogram', 'range': (0.01, 20)},
+                   'attenuation': {'kind': 'histogram'},
+                   'num_frames': {'kind': 'histogram'},
+                   }
     date_field = 'modified'
     list_url = reverse_lazy("data-list")
 
@@ -937,8 +1031,13 @@ def format_score(val, record):
 class ReportList(ListViewMixin, ItemListView):
     model = models.AnalysisReport
     list_filters = ['modified', 'kind']
-    list_columns = ['id', 'name', 'kind', 'score', 'modified']
-    list_search = ['project__username', 'name', 'data__name']
+    list_columns = ['id', 'name', 'energy', 'kind', 'score', 'modified']
+    if LIMS_USE_PROPOSAL:
+        list_filters = ['proposal__name', 'modified', 'kind']
+        list_search = ['proposal__name', 'name', 'data__name']
+    else:
+        list_filters = ['modified', 'kind']
+        list_search = ['project__username', 'name', 'data__name']
     link_field = 'name'
     link_url = 'report-detail'
     ordering = ['-modified']
@@ -1004,15 +1103,26 @@ class ShipmentReportList(ReportList):
 
 class RequestList(ListViewMixin, ItemListView):
     model = models.Request
-    list_filters = [
-        'kind',
-        'status',
-        filters.YearFilterFactory('created', reverse=True),
-        filters.MonthFilterFactory('created'),
-        filters.QuarterFilterFactory('created'),
-        'project__designation',
-        'project__kind',
-    ]
+    if LIMS_USE_PROPOSAL:
+        list_filters = [
+            'kind',
+            'status',
+            filters.YearFilterFactory('created', reverse=True),
+            filters.MonthFilterFactory('created'),
+            filters.QuarterFilterFactory('created'),
+            'proposal__name',
+            'proposal__kind',
+        ]
+    else:
+        list_filters = [
+            'kind',
+            'status',
+            filters.YearFilterFactory('created', reverse=True),
+            filters.MonthFilterFactory('created'),
+            filters.QuarterFilterFactory('created'),
+            'project__designation',
+            'project__kind',
+        ]
     list_columns = ['kind', 'created', 'num_samples', 'status']
     list_search = ['kind__name', 'kind__description', 'comments', 'parameters']
     link_field = 'kind'
@@ -1064,23 +1174,41 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
     def get_form_initial(self, step):
         project = self.request.user
         if step == 'start':
+            samples = models.Sample.objects.filter(pk__in=self.request.GET.getlist('samples'))
+            groups = models.Group.objects.filter(pk__in=self.request.GET.getlist('groups'))
+            if groups:
+                proposal = groups.first().proposal
+            elif samples:
+                proposal = samples.first().proposal
+            else:
+                proposal = self.request.GET.get('proposal')
             return self.initial_dict.get(step, {
                 'project': project,
-                'groups': project.sample_groups.filter(pk__in=self.request.GET.getlist('groups')),
-                'samples': project.samples.filter(pk__in=self.request.GET.getlist('samples'))
+                'proposal': proposal,
+                'groups': groups,
+                'samples': samples,
             })
         elif step == 'parameters':
             start_data = self.storage.get_step_data('start')
             if start_data:
                 kind = start_data.get('start-kind')
+                samples = models.Sample.objects.filter(pk__in=start_data.getlist('start-samples'))
+                groups = models.Group.objects.filter(pk__in=start_data.getlist('start-groups'))
+                if groups:
+                    proposal = groups.first().proposal
+                elif samples:
+                    proposal = samples.first().proposal
+                else:
+                    proposal = start_data.get('start-proposal')
                 return self.initial_dict.get(step, {
                     'kind': kind,
                     'template': start_data.get('start-template'),
                     'request': start_data.get('start-request'),
                     'comments': start_data.get('start-comments'),
                     'name': start_data.get('start-name'),
-                    'samples': project.samples.filter(pk__in=start_data.getlist('start-samples')),
-                    'groups': project.sample_groups.filter(pk__in=start_data.getlist('start-groups')),
+                    'samples': samples,
+                    'groups': groups,
+                    'proposal': proposal,
                 })
         return self.initial_dict.get(step, {})
 
@@ -1094,7 +1222,7 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
                 for field in ['groups', 'samples']:
                     related[field] = info.pop(field)
                 info.pop('template')
-                info.update({'project': models.Project.objects.get(username=self.request.user.username),})
+                info.update({'project': models.Project.objects.get(username=self.request.user.username), })
             elif label == 'parameters':
                 request = info.pop('request')
                 if not request:
@@ -1107,13 +1235,18 @@ class RequestWizardCreate(LoginRequiredMixin, SessionWizardView):
 
 
 class RequestWizardEdit(UserPassesTestMixin, SessionWizardView):
-    form_list = [('start', forms.RequestForm),
-                 ('parameters', forms.RequestParameterForm)]
+    form_list = [('parameters', forms.RequestParameterForm)]
     template_name = "lims/forms/add-request.html"
 
+    def get_object(self):
+        return models.Request.objects.get(**self.kwargs)
+
     def test_func(self):
+        if LIMS_USE_PROPOSAL:
+            return self.request.user.is_superuser or getattr(self.get_object(), 'proposal').is_team_member(
+                self.request.user)
         try:
-            return models.Request.objects.get(**self.kwargs).project.username == self.request.user.username
+            return self.get_object().project.username == self.request.user.username
         except models.Request.DoesNotExist:
             return False
 
@@ -1177,7 +1310,8 @@ class RequestDelete(OwnerRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edi
         super().delete(request, *args, **kwargs)
         models.ActivityLog.objects.log_activity(self.request, obj, models.ActivityLog.TYPE.DELETE,
                                                 self.success_message)
-        return JsonResponse({'url': obj.shipment() and obj.shipment().get_absolute_url() or reverse_lazy('request-list')})
+        return JsonResponse(
+            {'url': obj.shipment() and obj.shipment().get_absolute_url() or reverse_lazy('request-list')})
 
 
 class SessionDataList(ShipmentDataList):
@@ -1203,6 +1337,15 @@ class ActivityLogList(ListViewMixin, ItemListView):
     link_url = 'activitylog-detail'
     link_attr = 'data-link'
     detail_target = '#modal-target'
+
+    def get_list_columns(self):
+        if LIMS_USE_PROPOSAL:
+            columns = self.list_columns
+        else:
+            columns = super().get_list_columns()
+        if self.request.user.is_superuser and self.show_project:
+            return ['project__name'] + columns
+        return columns
 
 
 def format_total_time(val, record):
@@ -1296,10 +1439,18 @@ class ShipmentCreate(LoginRequiredMixin, SessionWizardView):
             if label == 'shipment':
                 data = form.cleaned_data
                 if self.request.user.is_superuser:
-                    data.update({
-                        'project': data.get('project'),
-                        'staff_comments': 'Created by staff!'
-                    })
+                    if LIMS_USE_PROPOSAL:
+                        proposal = data.get('proposal')
+
+                        data.update({
+                            'project': proposal.team_members.first(),
+                            'staff_comments': 'Created by staff!'
+                        })
+                    else:
+                        data.update({
+                            'project': data.get('project'),
+                            'staff_comments': 'Created by staff!'
+                        })
                 else:
                     data.update({
                         'project': self.request.user
@@ -1312,17 +1463,20 @@ class ShipmentCreate(LoginRequiredMixin, SessionWizardView):
                         'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
                         'name': name.upper(),
                         'shipment': self.shipment,
-                        'project': project
+                        'project': project,
+                        'proposal': self.shipment.proposal
                     }
                     models.Container.objects.get_or_create(**data)
             elif label == 'groups':
+                proposal = self.shipment.proposal
                 if self.request.POST.get('submit') == 'Fill':
                     for i, container in enumerate(self.shipment.containers.all()):
-                        group = self.shipment.groups.create(name=container.name, project=project, priority=(i+1))
+                        group = self.shipment.groups.create(name=container.name, project=project, priority=(i + 1),
+                                                            proposal=proposal)
                         group_samples = [
                             models.Sample(
                                 name='{}_{}'.format(group.name, location.name), group=group, project=project,
-                                container=container, location=location
+                                container=container, location=location, proposal=proposal
                             )
                             for location in container.kind.locations.all()
                         ]
@@ -1338,6 +1492,7 @@ class ShipmentCreate(LoginRequiredMixin, SessionWizardView):
                             data.update({
                                 'shipment': self.shipment,
                                 'project': project,
+                                'proposal': proposal,
                                 'priority': i + 1
                             })
                             models.Group.objects.get_or_create(**data)
@@ -1367,13 +1522,23 @@ class ShipmentAddContainer(LoginRequiredMixin, SuccessMessageMixin, AsyncFormMix
             if data['id_set'][i]:
                 models.Container.objects.filter(pk=int(data['id_set'][i])).update(name=data['name_set'][i])
             else:
-                info = {
-                    'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
-                    'name': name.upper(),
-                    'shipment': data['shipment'],
-                    'project': data['shipment'].project,
-                    'status': data['shipment'].status
-                }
+                if LIMS_USE_PROPOSAL:
+                    info = {
+                        'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
+                        'name': name.upper(),
+                        'shipment': data['shipment'],
+                        'project': data['shipment'].project,
+                        'proposal': data['shipment'].proposal,
+                        'status': data['shipment'].status
+                    }
+                else:
+                    info = {
+                        'kind': models.ContainerType.objects.get(pk=form.cleaned_data['kind_set'][i]),
+                        'name': name.upper(),
+                        'shipment': data['shipment'],
+                        'project': data['shipment'].project,
+                        'status': data['shipment'].status
+                    }
                 models.Container.objects.get_or_create(**info)
         return HttpResponseRedirect(reverse('shipment-add-groups', kwargs={'pk': self.kwargs.get('pk')}))
 
@@ -1406,11 +1571,19 @@ class ShipmentAddGroup(LoginRequiredMixin, SuccessMessageMixin, AsyncFormMixin, 
             info = {
                 field: data['{}_set'.format(field)][i]
                 for field in ['name', 'comments']}
-            info.update({
-                'shipment': data['shipment'],
-                'project': data['shipment'].project,
-                'priority': i + 1
-            })
+            if LIMS_USE_PROPOSAL:
+                info.update({
+                    'shipment': data['shipment'],
+                    'project': data['shipment'].project,
+                    'proposal': data['shipment'].proposal,
+                    'priority': i + 1
+                })
+            else:
+                info.update({
+                    'shipment': data['shipment'],
+                    'project': data['shipment'].project,
+                    'priority': i + 1
+                })
             if data['id_set'][i]:
                 models.Group.objects.filter(pk=int(data['id_set'][i])).update(**info)
             else:
@@ -1432,6 +1605,8 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
     def post(self, request, *args, **kwargs):
         if request.user.is_superuser:
             qs = models.Container.objects.filter()
+        elif LIMS_USE_PROPOSAL:
+            qs = models.Container.objects.filter(proposal__in=self.request.user.proposals)
         else:
             qs = models.Container.objects.filter(project=self.request.user)
         try:
@@ -1444,10 +1619,17 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
             }
             group_map = {}
             for name in groups:
-                group, created = models.Group.objects.get_or_create(
-                    project=container.project, shipment=container.shipment,
-                    name=name,
-                )
+                if LIMS_USE_PROPOSAL:
+                    group, created = models.Group.objects.get_or_create(
+                        shipment=container.shipment,
+                        project=container.project,
+                        name=name, proposal=container.proposal
+                    )
+                else:
+                    group, created = models.Group.objects.get_or_create(
+                        project=container.project, shipment=container.shipment,
+                        name=name,
+                    )
                 group_map[name] = group
 
             for sample in samples:
@@ -1461,13 +1643,24 @@ class ContainerSpreadsheet(LoginRequiredMixin, AsyncFormMixin, detail.DetailView
                     'comments': sample['comments'],
                 }
                 if sample.get('name') and sample.get('sample'):  # update entries
-                    models.Sample.objects.filter(project=container.project, pk=sample.get('sample')).update(**info)
+                    if LIMS_USE_PROPOSAL:
+                        models.Sample.objects.filter(proposal=container.proposal, pk=sample.get('sample')).update(**info)
+                    else:
+                        models.Sample.objects.filter(project=container.project, pk=sample.get('sample')).update(**info)
                 elif sample.get('name'):  # create new entry
-                    models.Sample.objects.create(project=container.project, **info)
+                    if LIMS_USE_PROPOSAL:
+                        models.Sample.objects.create(project=container.project, proposal=container.proposal, **info)
+                    else:
+                        models.Sample.objects.create(project=container.project, **info)
                 else:  # delete existing entry
-                    models.Sample.objects.filter(
-                        project=container.project, location_id=sample['location'], container=container
-                    ).delete()
+                    if LIMS_USE_PROPOSAL:
+                        models.Sample.objects.filter(
+                            proposal=container.proposal, location_id=sample['location'], container=container
+                        ).delete()
+                    else:
+                        models.Sample.objects.filter(
+                            project=container.project, location_id=sample['location'], container=container
+                        ).delete()
 
             return JsonResponse({'url': container.get_absolute_url()}, safe=False)
         except models.Container.DoesNotExist:
@@ -1563,16 +1756,89 @@ class GuideDelete(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.
         return context
 
 
+class ProposalEdit(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.UpdateView):
+    form_class = forms.ProposalForm
+    template_name = "modal/form.html"
+    model = models.Proposal
+    success_url = reverse_lazy('proposal-list')
+    success_message = "Proposal has been updated"
+
+
+class ProposalCreate(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edit.CreateView):
+    form_class = forms.ProposalForm
+    template_name = "modal/form.html"
+    model = models.Proposal
+    success_url = reverse_lazy('proposal-list')
+    success_message = "New Proposal '%(name)s' has been created."
+
+    def form_valid(self, form):
+        # create local user
+        response = super().form_valid(form)
+        info_msg = 'New Proposal {} added'.format(self.object)
+
+        models.ActivityLog.objects.log_activity(
+            self.request, self.object, models.ActivityLog.TYPE.CREATE, info_msg
+        )
+        # messages are simply passed down to the template via the request context
+        return response
+
+
+class ProposalListView(LoginRequiredMixin, ItemListView):
+    model = models.Proposal
+    template_name = "lims/proposal-list.html"
+    list_filters = ['modified', 'kind']
+    list_columns = ['id', 'name', 'members', 'kind', 'modified', 'active']
+    list_search = ['name', 'team_members__name']
+    link_field = 'name'
+    link_url = 'proposal-detail'
+    add_url = 'new-proposal'
+    ordering = ['-modified']
+    paginate_by = 25
+
+    def get_queryset(self):
+        selector = {}
+        if not self.request.user.is_superuser:
+            if LIMS_USE_PROPOSAL:
+                project = self.request.user
+                proposals = project.proposals.values_list('pk', flat=True)
+                selector = {'id__in': proposals}
+            else:
+                selector = {'project': self.request.user}
+        return super().get_queryset().filter(**selector)
+
+
+class ProposalDetail(OwnerRequiredMixin, detail.DetailView):
+    model = models.Proposal
+    template_name = "lims/entries/proposal.html"
+
+
+class ProposalDataList(ShipmentDataList):
+    template_name = "lims/entries/proposal-data.html"
+    lookup = 'proposal__pk'
+    detail_model = models.Proposal
+
+
+class ProposalReportList(ShipmentReportList):
+    template_name = "lims/entries/proposal-reports.html"
+    lookup = 'data__proposal__pk'
+    detail_model = models.Proposal
+
+
 class ProxyView(View):
     def get(self, request, *args, **kwargs):
         remote_url = DOWNLOAD_PROXY_URL + request.path
         if kwargs.get('section') == 'archive':
             return fetch_archive(request, remote_url)
+        if CERT_KEY:
+            return proxy_view(request, remote_url, requests_args={'verify': CERT_KEY})
         return proxy_view(request, remote_url)
 
 
 def fetch_archive(request, url):
-    r = requests.get(url, stream=True)
+    if CERT_KEY:
+        r = requests.get(url, stream=True, verify=CERT_KEY)
+    else:
+        r = requests.get(url, stream=True)
     if r.status_code == 200:
         resp = http.StreamingHttpResponse(r, content_type='application/x-gzip')
         resp['Content-Disposition'] = r.headers.get('Content-Disposition', 'attachment; filename=archive.tar.gz')
@@ -1661,13 +1927,15 @@ class ProjectDelete(AdminRequiredMixin, SuccessMessageMixin, AsyncFormMixin, edi
 
 def record_logout(sender, user, request, **kwargs):
     """ user logged outof the system """
-    models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGOUT, '{} logged-out'.format(user.username))
+    models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGOUT,
+                                            '{} logged-out'.format(user.username))
 
 
 def record_login(sender, user, request, **kwargs):
     """ Login a user into the system """
     if user.is_authenticated:
-        models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGIN, '{} logged-in'.format(user.username))
+        models.ActivityLog.objects.log_activity(request, user, models.ActivityLog.TYPE.LOGIN,
+                                                '{} logged-in'.format(user.username))
         last_login = models.ActivityLog.objects.last_login(request)
         if last_login is not None:
             last_host = last_login.ip_number
