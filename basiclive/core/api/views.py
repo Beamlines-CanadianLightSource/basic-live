@@ -114,6 +114,63 @@ class UpdateUserKey(View):
 
         return JsonResponse({})
 
+@method_decorator(csrf_exempt, name='dispatch')
+class AccessList(View):
+    """
+    Returns list of usernames that should be able to access the remote server referenced by the IP number inferred from
+    the request.
+
+    :key: r'^accesslist/$'
+    """
+
+    def get(self, request, *args, **kwargs):
+
+        from ..acl.models import AccessList
+        from ipaddress import ip_address
+
+        address = ip_address(request.META['REMOTE_ADDR'])
+
+        userlist = AccessList.objects.filter(address=address, active=True).first()
+
+        if userlist:
+            return JsonResponse(userlist.access_users(), safe=False)
+        else:
+            return JsonResponse([], safe=False)
+
+    def post(self, request, *args, **kwargs):
+        from ..acl.models import AccessList, Access
+        from ipaddress import ip_address
+        from datetime import datetime
+
+        address = ip_address(request.META['REMOTE_ADDR'])
+        userlist = AccessList.objects.filter(address=address, active=True).first()
+
+        tz = timezone.get_current_timezone()
+        errors = []
+
+        if userlist:
+            data = msgpack.loads(request.body)
+            for conn in data:
+                try:
+                    project = Project.objects.get(username=conn['project'])
+                except:
+                    errors.append("User '{}' not found.".format(conn['project']))
+                status = conn['status']
+                try:
+                    dt = tz.localize(datetime.strptime(conn['date'], "%Y-%m-%d %H:%M:%S"))
+                    r, created = Access.objects.get_or_create(name=conn['name'], userlist=userlist, user=project)
+                    r.status = status
+                    if created:
+                        r.created = dt
+                    else:
+                        r.end = dt
+                    r.save()
+                except:
+                    pass
+
+            return JsonResponse(userlist.access_users(), safe=False)
+        else:
+            return JsonResponse([], safe=False)
 
 class LaunchProposalSession(VerificationMixin, View):
     """

@@ -211,7 +211,7 @@ class StaffDashboard(AdminRequiredMixin, detail.DetailView):
         access_info = []
         connections = []
         sessions = []
-        active_access = LIMS_USE_ACL and Access.objects.filter(status__iexact=Access.STATES.CONNECTED) or []
+        active_access = Access.objects.filter(status__iexact=Access.STATES.CONNECTED)
         if LIMS_USE_SCHEDULE:
             context.update(access_types=AccessType.objects.all(),
                            support=BeamlineSupport.objects.filter(date=timezone.localtime().date()).first())
@@ -259,11 +259,12 @@ class StaffDashboard(AdminRequiredMixin, detail.DetailView):
 
         for i, conn in enumerate(access_info):
             access_info[i]['shipments'] = shipments.filter(project=conn['user']).count()
-            access_info[i]['connections'] = LIMS_USE_ACL and {
-                access.name: access_info[i]['connections'].filter(userlist=access)
-                for access in AccessList.objects.filter(
-                    pk__in=access_info[i]['connections'].values_list('userlist__pk', flat=True)).distinct()
-            } or {}
+            if access_info[i]['connections']:
+                access_info[i]['connections'] = LIMS_USE_ACL and {
+                    access.name: access_info[i]['connections'].filter(userlist=access)
+                    for access in AccessList.objects.filter(
+                        pk__in=access_info[i]['connections'].values_list('userlist__pk', flat=True)).distinct()
+                } or {}
 
         context.update(connections=access_info, adaptors=adaptors, shipments=shipments, beamlines=beamlines)
         return context
