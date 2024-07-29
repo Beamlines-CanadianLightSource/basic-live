@@ -48,7 +48,7 @@ def defaulted_namedtuple(typename, fields, defaults=None):
     Type.__new__.__defaults__ = (None,) * len(Type._fields)
     try:
         mapping = collections.Mapping
-    except ImportError:
+    except AttributeError:
         mapping = collections.abc.Mapping
     if isinstance(defaults, mapping):
         prototype = Type(**defaults)
