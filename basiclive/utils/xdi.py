@@ -50,7 +50,7 @@ def defaulted_namedtuple(typename, fields, defaults=None):
         mapping = collections.Mapping
     except ImportError:
         mapping = collections.abc.Mapping
-    if isinstance(defaults, collections.Mapping):
+    if isinstance(defaults, mapping):
         prototype = Type(**defaults)
         Type.__new__.__defaults__ = tuple(prototype)
     return Type
