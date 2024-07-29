@@ -45,7 +45,11 @@ class TimedModel(models.Model):
 
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
-    expired = models.DateTimeField(default=timezone.datetime(9999, 12, 31, tzinfo=timezone.utc), db_index=True, editable=False)
+    try:
+        tzone = timezone.utc
+    except AttributeError:
+        tzone = timezone.get_default_timezone()
+    expired = models.DateTimeField(default=timezone.datetime(9999, 12, 31, tzinfo=tzone), db_index=True, editable=False)
 
     objects = TMObjectsManager()
     entries = TMEntriesManager()
