@@ -32,6 +32,7 @@ pyasn1
 pycparser
 python-dateutil
 python-memcached
+python-baseconv
 pytz
 requests
 setuptools
